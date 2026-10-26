@@ -1,0 +1,4 @@
+# Terms that must never appear in the memory: client names, internal domains,
+# confidential project names. One per line, case-insensitive.
+# THIS FILE IS A TEMPLATE. install.sh copies it to ~/.config/ai-memory/forbidden-terms.txt
+# (outside the repository). Fill it in there, not here: the list itself is sensitive.

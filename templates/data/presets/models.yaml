@@ -1,0 +1,19 @@
+# Which model for which task. Identifiers only; keys live in environment variables.
+# Verify the Gemini and local model identifiers before using them: they change often.
+
+tasks:
+  plan:        { provider: anthropic, model: claude-opus-5-5 }
+  code:        { provider: anthropic, model: claude-sonnet-5-5 }
+  quick:       { provider: anthropic, model: claude-haiku-5-5 }
+  long-context:{ provider: gemini,    model: <gemini-pro-actual> }
+  offline:     { provider: ollama,    model: <local-model>, context: 8192 }
+
+providers:
+  anthropic: { api_key_var: ANTHROPIC_API_KEY }
+  gemini:    { api_key_var: GEMINI_API_KEY }
+  ollama:    { base_url_var: OLLAMA_HOST }
+
+# Context budget injected by the memory (approx.)
+budget_tokens:
+  global_agents: 400
+  project_state: 1500

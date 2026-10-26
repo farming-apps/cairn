@@ -1,0 +1,22 @@
+{
+  "github.copilot.enable": {
+    "*": true,
+    "plaintext": false,
+    "dotenv": false,
+    "ini": false,
+    "properties": false
+  },
+  "files.associations": {
+    "**/.env*": "dotenv",
+    "**/*.pem": "plaintext",
+    "**/*.key": "plaintext",
+    "**/*.p12": "plaintext",
+    "**/*.tfvars": "plaintext",
+    "**/.netrc": "plaintext",
+    "**/.npmrc": "plaintext",
+    "**/.pypirc": "plaintext",
+    "**/.git-credentials": "plaintext",
+    "**/.ssh/config": "plaintext",
+    "**/.aws/credentials": "plaintext"
+  }
+}

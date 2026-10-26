@@ -1,0 +1,18 @@
+# Second barrier, on the remote: catches what slipped past the local hook (e.g. with --no-verify).
+# sanitize.py and check-size.sh live in the ai-memory tool repository; the local hook runs them.
+name: scan
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

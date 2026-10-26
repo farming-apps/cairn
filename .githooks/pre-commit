@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Local barrier before every commit: gitleaks + sanitize.py + check-size.sh on staged files.
+# Serves both the tool repo and the memory repo: tools/install.sh sets core.hooksPath of each one
+# to this directory, so the tools are resolved from the hook's own location, not from the repo.
+# If gitleaks is missing, the commit is blocked: a barrier that passes silently is not a barrier.
+set -euo pipefail
+
+TOOL_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+REPO="$(git rev-parse --show-toplevel)"
+cd "$REPO"
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "pre-commit: missing gitleaks. Install it (brew install gitleaks) and retry the commit." >&2
+  exit 1
+fi
+
+echo "pre-commit: gitleaks"
+if gitleaks git --help >/dev/null 2>&1; then
+  gitleaks git --pre-commit --staged --redact --no-banner -c "$TOOL_ROOT/.gitleaks.toml"
+else
+  gitleaks protect --staged --redact --no-banner -c "$TOOL_ROOT/.gitleaks.toml"
+fi
+
+echo "pre-commit: sanitize"
+python3 "$TOOL_ROOT/tools/sanitize.py" --staged
+
+echo "pre-commit: size"
+"$TOOL_ROOT/tools/check-size.sh" --staged

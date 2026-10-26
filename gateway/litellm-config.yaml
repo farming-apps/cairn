@@ -1,0 +1,21 @@
+# Phase 2: LiteLLM gateway to use a single endpoint for Claude, Gemini and local models.
+# Not in use yet. Only os.environ/... references; never values.
+# Before deploying: check the LiteLLM version and run it unprivileged, on localhost only.
+# Variables it will need in the environment: ANTHROPIC_API_KEY, GEMINI_API_KEY, OLLAMA_HOST, LITELLM_MASTER_KEY.
+
+model_list:
+  - model_name: claude-sonnet
+    litellm_params:
+      model: anthropic/claude-sonnet-5-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: gemini-pro
+    litellm_params:
+      model: gemini/<gemini-pro-actual>
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: local
+    litellm_params:
+      model: ollama/<local-model>
+      api_base: os.environ/OLLAMA_HOST
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

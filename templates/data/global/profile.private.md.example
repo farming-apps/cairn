@@ -1,0 +1,15 @@
+# Personal profile (private)
+
+This file is NOT versioned (`global/profile.private.md` is in `.gitignore`).
+`install.sh` copies this template if the real file does not exist. Edit it yourself, by hand.
+To move it to another machine, copy it over an encrypted channel or encrypt it with `age`/`sops`.
+
+## Who I am
+- Role:
+- Main expertise:
+- Working language: (e.g. Spanish; empty = the language you write in)
+
+## How I prefer to work
+- Level of detail in replies:
+- Usual tools:
+- What NOT to do without asking:

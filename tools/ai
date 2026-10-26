@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+"""Minimal client for local models or any OpenAI-compatible endpoint.
+
+Loads <data>/build/<project>/AGENTS.md as the system prompt (builds the bundle if missing) and
+sends your question. Works with Ollama, LM Studio, LiteLLM or any /v1/chat/completions server.
+<data> is the memory repo: $AI_MEMORY_PROJECTS_DATA, ~/.config/ai-memory/env, or this repo (see tools/lib.sh).
+
+Usage:
+  ai "question"                 detects the project from the current repo name
+  ai -p <project> "question"    explicit project
+  echo "question" | ai          also reads from stdin
+
+Variables (names only; values live in your environment or Keychain):
+  AI_ENDPOINT      base URL, default $OLLAMA_HOST/v1 or http://localhost:11434/v1
+  AI_MODEL         model name on the server
+  AI_API_KEY_VAR   NAME of the variable holding the key, if the endpoint requires one
+"""
+import json
+import os
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def data_dir():
+    """Memory repo: $AI_MEMORY_PROJECTS_DATA, else the AI_MEMORY_PROJECTS_DATA line in ~/.config/ai-memory/env, else ROOT.
+    Mirrors tools/lib.sh."""
+    value = os.environ.get("AI_MEMORY_PROJECTS_DATA", "")
+    if not value:
+        local_dir = os.path.expanduser(os.environ.get("AI_MEMORY_LOCAL") or "~/.config/ai-memory")
+        env_file = os.path.join(local_dir, "env")
+        if os.path.isfile(env_file):
+            with open(env_file, encoding="utf-8") as fh:
+                for line in fh:
+                    if line.startswith("AI_MEMORY_PROJECTS_DATA="):
+                        value = line.split("=", 1)[1].strip().strip('"')
+    return os.path.realpath(os.path.expanduser(value)) if value else ROOT
+
+
+DATA = data_dir()
+
+
+def detect_project():
+    try:
+        top = subprocess.check_output(["git", "rev-parse", "--show-toplevel"], stderr=subprocess.DEVNULL)
+        return os.path.basename(top.decode().strip())
+    except (subprocess.CalledProcessError, OSError):
+        return None
+
+
+def system_prompt(project):
+    if not project or not os.path.isdir(os.path.join(DATA, "project-memories", project)):
+        with open(os.path.join(DATA, "global", "AGENTS.md"), encoding="utf-8") as fh:
+            return fh.read()
+    bundle = os.path.join(DATA, "build", project, "AGENTS.md")
+    if not os.path.isfile(bundle):
+        subprocess.check_call([os.path.join(ROOT, "tools", "build.sh"), project])
+    with open(bundle, encoding="utf-8") as fh:
+        return fh.read()
+
+
+def main(argv):
+    project = None
+    if len(argv) >= 2 and argv[0] == "-p":
+        project, argv = argv[1], argv[2:]
+    question = " ".join(argv).strip() or sys.stdin.read().strip()
+    if not question:
+        print(__doc__)
+        return 2
+
+    endpoint = os.environ.get("AI_ENDPOINT") or (os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/") + "/v1")
+    model = os.environ.get("AI_MODEL")
+    if not model:
+        print("ai: set AI_MODEL (model name on the server)", file=sys.stderr)
+        return 2
+
+    headers = {"Content-Type": "application/json"}
+    key_var = os.environ.get("AI_API_KEY_VAR")
+    if key_var and os.environ.get(key_var):
+        headers["Authorization"] = "Bearer " + os.environ[key_var]
+
+    body = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt(project or detect_project())},
+            {"role": "user", "content": question},
+        ],
+    }
+    req = urllib.request.Request(endpoint.rstrip("/") + "/chat/completions",
+                                 data=json.dumps(body).encode(), headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=600) as resp:
+            data = json.load(resp)
+    except urllib.error.URLError as e:
+        print(f"ai: could not reach {endpoint}: {e}", file=sys.stderr)
+        return 1
+    print(data["choices"][0]["message"]["content"])
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

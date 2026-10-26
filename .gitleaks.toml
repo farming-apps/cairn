@@ -1,0 +1,31 @@
+# gitleaks rules for ai-memory: the defaults plus PII and paths that must not leave the machine.
+title = "ai-memory"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "email-address"
+description = "Email address"
+regex = '''[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'''
+keywords = ["@"]
+
+[[rules]]
+id = "private-ipv4"
+description = "Private IP (RFC 1918)"
+regex = '''\b(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})\b'''
+
+[[rules]]
+id = "home-path"
+description = "Absolute path to a user's home"
+regex = '''(/Users/[A-Za-z0-9._-]+|/home/[A-Za-z0-9._-]+|[A-Za-z]:\\Users\\[A-Za-z0-9._-]+)'''
+keywords = ["Users", "home"]
+
+[allowlist]
+description = "Files that contain patterns on purpose, and marked lines"
+paths = [
+  '''tools/sanitize\.py''',
+  '''\.gitleaks\.toml''',
+]
+regexTarget = "line"
+regexes = ['''sanitize:allow''']

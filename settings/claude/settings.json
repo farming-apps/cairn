@@ -1,0 +1,112 @@
+{
+  "permissions": {
+    "defaultMode": "plan",
+    "deny": [
+      "Bash(rm -rf /*)",
+      "Bash(rm -fr /*)",
+      "Bash(rm -rf ~*)",
+      "Bash(rm -fr ~*)",
+      "Bash(sudo rm *)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.git-credentials)",
+      "Read(~/.netrc)",
+      "Read(~/.config/gh/**)",
+      "Read(~/.config/gcloud/**)",
+      "Read(~/.azure/**)",
+      "Read(~/.kube/config)",
+      "Read(~/.docker/config.json)",
+      "Read(~/.codex/**)",
+      "Read(~/.gemini/oauth_creds.json)",
+      "Read(~/.npmrc)",
+      "Read(~/.pypirc)",
+      "Read(~/.cargo/credentials.toml)",
+      "Read(~/.password-store/**)",
+      "Read(~/Library/Keychains/**)",
+      "Read(~/Library/Cookies/**)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./**/.env)",
+      "Read(./**/.env.*)",
+      "Read(./**/*.pem)",
+      "Read(./**/*.key)",
+      "Read(./**/*.p12)",
+      "Edit(~/.claude/settings.json)",
+      "Edit(~/.claude/settings.local.json)",
+      "Edit(~/.claude/managed-settings.json)",
+      "Edit(~/.claude/CLAUDE.md)",
+      "Edit(~/.claude/hooks/**)",
+      "Edit(~/.claude.json)",
+      "Edit(~/.claude/.credentials.json)",
+      "Edit(~/.copilot/hooks/**)",
+      "Edit(~/.copilot/permissions-config.json)",
+      "Edit(~/.copilot/settings.json)",
+      "Edit(~/.copilot/copilot-instructions.md)",
+      "Edit(~/.gemini/antigravity-cli/settings.json)",
+      "Edit(~/.gemini/config/hooks.json)",
+      "Edit(~/.gemini/GEMINI.md)",
+      "Edit(~/.config/ai-memory/**)",
+      "Edit(~/.config/git-projects/**)",
+      "Edit(~/.ssh/**)",
+      "Edit(~/.aws/**)",
+      "Edit(~/.gnupg/**)",
+      "Edit(~/Library/LaunchAgents/**)"
+    ],
+    "ask": [
+      "Bash(sudo *)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean*)",
+      "Edit(./.claude/settings.json)",
+      "Edit(./.claude/settings.local.json)",
+      "Edit(./.claude/hooks/**)",
+      "Edit(./.mcp.json)",
+      "Edit(./.cursor/**)",
+      "Edit(./.vscode/**)",
+      "Edit(./.github/workflows/**)",
+      "Edit(./.githooks/**)",
+      "Edit(./.husky/**)",
+      "Edit(./.envrc)",
+      "Edit(./.git/config)",
+      "Edit(./.git/hooks/**)",
+      "Edit(**/guard-bash.py)",
+      "Edit(~/.zshrc)",
+      "Edit(~/.zshenv)",
+      "Edit(~/.zprofile)",
+      "Edit(~/.bashrc)",
+      "Edit(~/.bash_profile)",
+      "Edit(~/.profile)",
+      "Edit(~/.gitconfig)",
+      "Edit(~/.gemini/**)",
+      "Edit(~/.config/gh/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I \"{{AI_MEMORY_ROOT}}/tools/guard-bash.py\" # ai-memory",
+            "timeout": 5,
+            "onFailure": "block",
+            "statusMessage": "guard-bash"
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash \"{{AI_MEMORY_ROOT}}/tools/statusline.sh\" # ai-memory",
+    "padding": 0
+  },
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
+  }
+}

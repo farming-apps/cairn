@@ -1,0 +1,19 @@
+{
+  "statusLine": {
+    "type": "command",
+    "command": "bash \"{{AI_MEMORY_ROOT}}/tools/statusline.sh\"",
+    "padding": 0
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "bash": "python3 -I \"{{AI_MEMORY_ROOT}}/tools/guard-bash.py\" --out copilot # ai-memory",
+        "timeoutSec": 5
+      }
+    ]
+  },
+  "sandbox": {
+    "enabled": true
+  }
+}

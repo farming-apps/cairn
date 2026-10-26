@@ -1,0 +1,34 @@
+# Project registry grouped by arbitrary sections (e.g. section1, section2, section3).
+# THIS FILE IS A TEMPLATE. install.sh copies it to ~/.config/ai-memory/projects.yml
+# (outside the repository), or override the location with $AI_MEMORY_PROJECTS.
+# To back it up elsewhere encrypted: tools/projects.sh encrypt <path/projects.yml.age>
+#
+# Fields per project:
+#   path:    local repository path (~ is expanded)
+#   status:  active (default) | paused | archived
+#   agents:  true | false (optional; passes --agents to tools/new-project.sh)
+#   memory:  true (default) | false (registered, but no ai-memory bridges or project memory)
+#   notes:   short description (optional)
+# Other keys (e.g. remote: for a clone script in your dotfiles) are ignored, so one manifest can
+# serve both repos: point $AI_MEMORY_PROJECTS at it.
+
+section1:
+  # project-a:
+  #   path: ~/section1/project-a
+  #   status: active
+  #   notes: Main service
+
+section2:
+  # project-b:
+  #   path: ~/section2/project-b
+  #   agents: true
+  #   status: active
+
+section3:
+  # project-c:
+  #   path: ~/section3/project-c
+  #   status: paused
+  # project-d:
+  #   path: ~/section3/project-d
+  #   memory: false
+  #   notes: cloned here, no AI memory

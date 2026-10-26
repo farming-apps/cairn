@@ -1,0 +1,12 @@
+# Private profile: per machine, never versioned
+global/profile.private.md
+
+# Memory written by the model, pending review (promote it with tools/promote.sh)
+project-memories/*/pending/*
+!project-memories/*/pending/.gitkeep
+
+# Generated bundles for clients without imports (tools/build.sh)
+build/
+
+# System
+.DS_Store
