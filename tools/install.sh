@@ -4,11 +4,17 @@
 # None of the three AI clients (claude, agy, copilot) is mandatory: each one is configured
 # automatically if installed (or if its config dir exists), or when forced via flags.
 #
-# Usage: install.sh [--data <path>] [--dry-run] [--yes] [--module <m>] [--claude|--no-claude] [--gemini|--no-gemini] [--copilot|--no-copilot] [--vscode|--no-vscode]
+# Source: by default it checks out origin/main (local main without a remote) in a detached worktree
+# ($AI_MEMORY_INSTALL_DIR or ~/.local/share/ai-memory) and continues from there, so client hooks,
+# the status line and the memory repo's pre-commit hook run what was merged, not whatever branch is
+# checked out in this clone. Re-run it after merging to update the installed copy.
+#
+# Usage: install.sh [--data <path>] [--dev] [--dry-run] [--yes] [--module <m>] [--claude|--no-claude] [--gemini|--no-gemini] [--copilot|--no-copilot] [--vscode|--no-vscode]
 #   --data <path>          where the memory repository lives (global/, project-memories/, skills/...).
 #                          Remembered in ~/.config/ai-memory/env; created from templates/data/ if missing.
 #                          Without it, and with no env file, memory is expected inside this repo (single-repo layout).
-#   --dry-run              show what would be done without touching anything
+#   --dev                  install from this clone as it is (current branch, uncommitted changes), no worktree
+#   --dry-run             show what would be done without touching anything
 #   --yes                  install missing tools (gitleaks, jq) with Homebrew without asking
 #   --module <m>           comma-separated modules to run: hardening, memory, projects, all (default: all)
 #   --claude|--no-claude   force or skip Claude Code (default: auto)
@@ -30,11 +36,15 @@ DRY=0; YES=0
 CLAUDE=auto; GEMINI=auto; COPILOT=auto; VSCODE=auto
 MODULES="all"
 DATA_ARG=""
+DEV=0; FROM_WORKTREE=0
+ORIG_ARGS=("$@")
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --data)       DATA_ARG="${2:-}"; shift 2 ;;
     --data=*)     DATA_ARG="${1#*=}"; shift ;;
+    --dev)        DEV=1; shift ;;
+    --from-worktree) FROM_WORKTREE=1; shift ;;   # internal: added by the re-exec into the worktree
     --dry-run)    DRY=1; shift ;;
     --yes)        YES=1; shift ;;
     -m|--module)  MODULES="${2:-}"; shift 2 ;;
@@ -66,6 +76,49 @@ for m in ${MODULES//,/ }; do
 done
 
 [ -n "$DATA_ARG" ] && set_data "$DATA_ARG"
+
+# --- source: detached worktree of origin/main -----------------------------------------------------
+# Everything after this block runs from the worktree (ROOT = INSTALL_DIR), so the paths written into
+# the clients' settings and the memory repo's core.hooksPath point at the installed copy.
+if [ "$FROM_WORKTREE" -eq 0 ] && [ "$DEV" -eq 0 ]; then
+  install_real="$INSTALL_DIR"; [ -d "$INSTALL_DIR" ] && install_real="$(cd "$INSTALL_DIR" && pwd -P)"
+  if [ "$ROOT" = "$install_real" ]; then
+    printf 'source: running the installed copy (%s); to update it, run tools/install.sh from your clone\n' "$INSTALL_DIR"
+  elif ! git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+    printf 'source: %s is not a git repository; installing from it as it is (--dev)\n' "$ROOT"
+  elif ! data_is_separate; then
+    printf 'source: single-repo layout (memory inside this clone); installing from it as it is (--dev)\n'
+  else
+    # prefer the remote main (what has been merged); fall back to the local branch without a remote
+    if git -C "$ROOT" remote get-url origin >/dev/null 2>&1; then
+      git -C "$ROOT" fetch --quiet origin main 2>/dev/null || printf 'source: could not fetch origin (offline?); using the last known origin/main\n'
+    fi
+    if git -C "$ROOT" rev-parse -q --verify refs/remotes/origin/main >/dev/null; then ref="origin/main"; else ref="main"; fi
+    if [ "$DRY" -eq 1 ]; then
+      printf 'source: would check out %s (%s, detached) in %s\n' "$ref" "$(git -C "$ROOT" rev-parse --short "$ref")" "$INSTALL_DIR"
+      if [ ! -f "$INSTALL_DIR/tools/install.sh" ]; then
+        printf 'source: (dry-run) %s does not exist yet; showing the rest from this clone\n' "$INSTALL_DIR"
+        FROM_WORKTREE=1
+      fi
+    elif [ -e "$INSTALL_DIR/.git" ]; then
+      if [ -n "$(git -C "$INSTALL_DIR" status --porcelain 2>/dev/null)" ]; then
+        printf 'install: %s has local changes (git -C %s status); it is a generated copy: discard them and re-run\n' "$INSTALL_DIR" "$INSTALL_DIR" >&2
+        exit 1
+      fi
+      git -C "$INSTALL_DIR" checkout --quiet --detach "$ref"
+      printf 'source: %s updated to %s (%s)\n' "$INSTALL_DIR" "$ref" "$(git -C "$INSTALL_DIR" rev-parse --short HEAD)"
+    else
+      git -C "$ROOT" worktree prune
+      mkdir -p "$(dirname "$INSTALL_DIR")"
+      git -C "$ROOT" worktree add --quiet --detach "$INSTALL_DIR" "$ref"
+      printf 'source: %s checked out at %s (%s)\n' "$INSTALL_DIR" "$ref" "$(git -C "$INSTALL_DIR" rev-parse --short HEAD)"
+    fi
+    if [ "$FROM_WORKTREE" -eq 0 ]; then
+      exec bash "$INSTALL_DIR/tools/install.sh" --from-worktree ${ORIG_ARGS[@]+"${ORIG_ARGS[@]}"}
+    fi
+  fi
+fi
+
 COPILOT_DIR="${COPILOT_HOME:-$HOME/.copilot}"
 # VS Code user settings dir: $VSCODE_USER_DIR overrides; macOS and Linux defaults otherwise.
 case "$(uname -s)" in

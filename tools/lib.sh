@@ -7,6 +7,8 @@
 #               resolved from, in order: $AI_MEMORY_PROJECTS_DATA, the AI_MEMORY_PROJECTS_DATA line in $LOCAL_DIR/env,
 #               and finally $ROOT itself (single-repo layout, as before the split)
 #   PM_DIR      $DATA/project-memories        BUILD_DIR  $DATA/build (git-ignored bundles)
+#   INSTALL_DIR the installed copy: a detached worktree of origin/main made by install.sh
+#               ($AI_MEMORY_INSTALL_DIR or ~/.local/share/ai-memory); client hooks point there
 #   ROOT_TILDE / DATA_TILDE   the same with $HOME written as ~ (agy documents ~/ paths in its includes)
 #
 # Usage from a script:  . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -17,6 +19,8 @@ unset _lib_dir
 
 LOCAL_DIR="${AI_MEMORY_LOCAL:-$HOME/.config/ai-memory}"
 LOCAL_DIR="${LOCAL_DIR/#\~/$HOME}"
+INSTALL_DIR="${AI_MEMORY_INSTALL_DIR:-$HOME/.local/share/ai-memory}"
+INSTALL_DIR="${INSTALL_DIR/#\~/$HOME}"
 
 if [ -z "${AI_MEMORY_PROJECTS_DATA:-}" ] && [ -f "$LOCAL_DIR/env" ]; then
   # Only the AI_MEMORY_PROJECTS_DATA line is read; the file is written by install.sh --data.
@@ -37,3 +41,8 @@ set_data "${AI_MEMORY_PROJECTS_DATA:-$ROOT}"
 
 # 0 when memory lives in its own repository, 1 in the single-repo layout.
 data_is_separate() { [ "$DATA" != "$ROOT" ]; }
+
+# Root the client hooks should point to: the installed worktree if there is one, else this repo (--dev).
+hook_root() {
+  if [ -f "$INSTALL_DIR/tools/guard-bash.py" ]; then (cd "$INSTALL_DIR" && pwd -P); else printf '%s' "$ROOT"; fi
+}

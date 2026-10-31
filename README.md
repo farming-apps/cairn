@@ -44,6 +44,15 @@ git clone <tool-repo> ~/ai-memory                        # any path works
 ```
 `--data` is remembered in `~/.config/ai-memory/env`; later runs do not need it. On a second machine,
 clone your private memory repo first and point `--data` at it.
+
+**Installed copy.** `install.sh` does not wire the clients to your clone. It checks out `origin/main`
+(local `main` if there is no remote) in a detached worktree at `~/.local/share/ai-memory`
+(`AI_MEMORY_INSTALL_DIR` overrides it) and re-runs itself from there. That way the guard-bash hook,
+the status line and the memory repo's pre-commit hook run what was merged, and switching branches in
+the clone does not change them. To update after a merge, run `tools/install.sh` again from the clone.
+`--dev` skips the worktree and installs from the clone as it is, to try a branch. The single-repo
+layout (memory inside the clone) always installs this way. `doctor.sh` warns when the installed copy
+is behind `origin/main`, and fails if it has local changes.
 None of the three supported AI clients (**Claude Code**, **Antigravity CLI `agy`**, **GitHub Copilot CLI `copilot`**) is mandatory: `install.sh` and `doctor.sh` auto-detect which ones are installed on the machine and skip the rest without failing. You can also run a single module with `--module hardening`, `--module memory`, or `--module projects`.
 `install.sh` is idempotent and prints every step. It first checks the tools: `gitleaks` (the hook
 blocks commits without it) and `jq` (status line) are offered for install with Homebrew, asking
