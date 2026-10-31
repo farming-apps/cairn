@@ -41,7 +41,7 @@ data_is_separate() { [ "$DATA" != "$ROOT" ]; }
 # Tool release version (bumped by release-please) and the memory-repo layout this version understands.
 # The layout lives in $DATA/.ai-memory-layout (a single integer; missing means 1). Bump DATA_LAYOUT_SUPPORTED
 # only together with a migration in migrations/ that update.sh can run.
-tool_version() { if [ -f "$ROOT/VERSION" ]; then tr -d '[:space:]' <"$ROOT/VERSION"; else printf 'unknown'; fi; }
+ai_memory_version() { if [ -f "$ROOT/VERSION" ]; then tr -d '[:space:]' <"$ROOT/VERSION"; else printf 'unknown'; fi; }
 DATA_LAYOUT_SUPPORTED=1
 data_layout() { # prints the layout of $DATA
   local v=1

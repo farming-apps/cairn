@@ -41,7 +41,7 @@ g() { git -C "$ROOT" "$@"; }
 
 # --- phase 2: runs from the freshly checked-out version --------------------------------------------
 if [ "$POST" -eq 1 ]; then
-  say "ai-memory $(tool_version) at $ROOT"
+  say "ai-memory $(ai_memory_version) at $ROOT"
   if data_is_separate && [ -d "$DATA" ]; then
     layout="$(data_layout)"
     if [ "$layout" -gt "$DATA_LAYOUT_SUPPORTED" ]; then
@@ -85,7 +85,7 @@ fi
 current="$(g describe --tags --exact-match HEAD 2>/dev/null || g rev-parse --short HEAD)"
 head_sha="$(g rev-parse HEAD)"; target_sha="$(g rev-parse "$target^{commit}")"
 if [ "$head_sha" = "$target_sha" ]; then
-  say "ai-memory is up to date ($current, version $(tool_version))"
+  say "ai-memory is up to date ($current, version $(ai_memory_version))"
   exit 0
 fi
 if [ "$CHECK" -eq 1 ]; then
