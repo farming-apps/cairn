@@ -3,7 +3,7 @@
 # None of the three AI clients (claude, agy, copilot) is mandatory: only installed clients are required
 # to pass; missing ones are reported as WARN (skipped). Exits 1 if there is any FAIL.
 #
-# Usage: doctor.sh [--module <hardening,memory,projects,all>] [work-repo-path ...]
+# Usage: doctor.sh [--module <hardening,memory,mcp,projects,all>] [work-repo-path ...]
 set -uo pipefail
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -33,8 +33,8 @@ has_module() {
 }
 for m in ${MODULES//,/ }; do
   case "$m" in
-    all|hardening|memory|projects) ;;
-    *) echo "doctor: unknown module '$m' (expected: hardening, memory, projects, all)" >&2; exit 2 ;;
+    all|hardening|memory|mcp|projects) ;;
+    *) echo "doctor: unknown module '$m' (expected: hardening, memory, mcp, projects, all)" >&2; exit 2 ;;
   esac
 done
 
@@ -308,6 +308,34 @@ if has_module memory; then
     fi
   else
     warn "copilot not installed (skipped)"
+  fi
+fi
+
+# =============================================================================================
+# MODULE: MCP
+# =============================================================================================
+if has_module mcp; then
+  echo
+  echo "=== Module: mcp ==="
+  mcp_clients=()
+  [ "$has_claude" -eq 1 ] && mcp_clients+=(claude)
+  [ "$has_agy" -eq 1 ] && mcp_clients+=(agy)
+  [ "$has_copilot" -eq 1 ] && mcp_clients+=(copilot)
+  [ "$has_vscode" -eq 1 ] && mcp_clients+=(vscode)
+  if [ "${#mcp_clients[@]}" -eq 0 ]; then
+    warn "no AI client installed (skipped)"
+  else
+    out="$(python3 -I "$ROOT/tools/render-mcp.py" --check --catalog "$DATA/mcp/servers.json" \
+            --state "$LOCAL_DIR/mcp-managed.json" --copilot-dir "$COPILOT_DIR" --vscode-dir "$VSCODE_DIR" \
+            --clients "$(IFS=,; echo "${mcp_clients[*]}")" 2>&1)"
+    rc=$?
+    # Only the verdict lines: the diff itself is for install.sh --dry-run.
+    printf '%s\n' "$out" | grep -E '^  (ok|WARN|FAIL) ' | sed 's/^  ok  /  OK  /' || true
+    case "$rc" in
+      0) ok "mcp: clients match the catalog" ;;
+      3) ;;   # drift already reported as WARN
+      *) fails=$((fails+1)) ;;
+    esac
   fi
 fi
 

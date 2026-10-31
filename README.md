@@ -19,13 +19,14 @@ templates/data/    skeleton of the memory repo (copied by install.sh --data):
   skills/            shared global skills (<skill>/SKILL.md) linked into Claude, Agy and Copilot
   prompts/           reusable prompts
   presets/           which model for which task, no keys
+  mcp/servers.json   MCP server catalog, rendered into every installed client (no secret values)
 templates/         templates for local machine files (forbidden-terms.txt, projects.yml)
 gateway/           LiteLLM config for phase 2 (os.environ/... only)
 settings/claude/   Claude Code policy: deny/ask permissions + guard-bash hook + statusLine
 settings/agy/      Antigravity CLI (agy) policy: permissions + guard-bash hook + statusLine
 settings/copilot/  GitHub Copilot CLI policy: guard-bash hook + sandbox + statusLine
 settings/vscode/   VS Code: built-in Copilot off in .env, credentials and other sensitive file types
-tools/             install · doctor · projects · new-project · promote · build · ai · sanitize · check-size · guard-bash · merge-settings · lib
+tools/             install · doctor · projects · new-project · promote · build · ai · sanitize · check-size · guard-bash · merge-settings · render-mcp · lib
 .githooks/         pre-commit: gitleaks + sanitize + size (shared by both repos)
 .github/workflows/ the same scan on the remote
 docs/security.md   rules and what to do if something leaks
@@ -40,11 +41,11 @@ Command Line Tools (`xcode-select --install`).
 ```sh
 git clone <tool-repo> ~/ai-memory                        # any path works
 ~/ai-memory/tools/install.sh --data ~/ai-memory-data     # creates the memory repo if missing, or clone yours first
-~/ai-memory/tools/doctor.sh                              # --module hardening,memory,projects (all by default)
+~/ai-memory/tools/doctor.sh                              # --module hardening,memory,mcp,projects (all by default)
 ```
 `--data` is remembered in `~/.config/ai-memory/env`; later runs do not need it. On a second machine,
 clone your private memory repo first and point `--data` at it.
-None of the three supported AI clients (**Claude Code**, **Antigravity CLI `agy`**, **GitHub Copilot CLI `copilot`**) is mandatory: `install.sh` and `doctor.sh` auto-detect which ones are installed on the machine and skip the rest without failing. You can also run a single module with `--module hardening`, `--module memory`, or `--module projects`.
+None of the three supported AI clients (**Claude Code**, **Antigravity CLI `agy`**, **GitHub Copilot CLI `copilot`**) is mandatory: `install.sh` and `doctor.sh` auto-detect which ones are installed on the machine and skip the rest without failing. You can also run a single module with `--module hardening`, `--module memory`, `--module mcp`, or `--module projects`.
 `install.sh` is idempotent and prints every step. It first checks the tools: `gitleaks` (the hook
 blocks commits without it) and `jq` (status line) are offered for install with Homebrew, asking
 before each one; without Homebrew it tells you what to install and goes on. Then it writes an import
@@ -61,6 +62,34 @@ appear under *Memory files* and with `/hooks` that `guard-bash` is active.
 `git clean`. The prefix rules are reinforced by the `tools/guard-bash.py` hook, which analyses each
 command (`rm -fr`, `rm -r -f`, `sh -c "rm -rf …"`, empty variables, `find -delete`, `curl | sh`).
 Details, rationale and how to change it in [settings/README.md](settings/README.md).
+
+## MCP servers
+One catalog, `<data>/mcp/servers.json`, describes the MCP servers you want everywhere; `install.sh
+--module mcp` translates it into each installed client and `doctor.sh --module mcp` reports drift.
+```json
+{"servers": {
+  "github": {"url": "https://host/mcp", "headers": {"Authorization": "Bearer ${GITHUB_MCP_TOKEN}"}},
+  "fs": {"command": "npx", "args": ["-y", "@scope/pkg@1.2.3", "/path"], "clients": ["claude", "vscode"]}
+}}
+```
+| Client | Written to |
+|---|---|
+| Claude Code | user scope, via `claude mcp add-json -s user` / `claude mcp remove` |
+| Antigravity CLI | `~/.gemini/config/mcp_config.json` (`mcpServers`, remote as `serverUrl`) |
+| Copilot CLI | `~/.copilot/mcp-config.json` (`mcpServers`, `type: local\|http`, `tools: ["*"]`) |
+| VS Code | `<user dir>/mcp.json` (`servers`; references become `${env:VAR}`) |
+
+- Only servers ai-memory created are updated or removed (their names live in
+  `~/.config/ai-memory/mcp-managed.json`); yours are kept, and a catalog name that collides with one
+  of them is skipped with a warning. Every write leaves a `.bak.<timestamp>`.
+- Secret-looking `env`/`headers` values must be `${VAR}` references and URLs must not carry
+  credentials, or the render fails. Values are never resolved: each client expands the reference
+  at start-up, so export the variable (or let your secrets resolver do it). Check that your client
+  version expands `${VAR}` in that file before relying on it.
+- Packages started with `npx`/`uvx`/`bunx`/`pnpm dlx` must be pinned (`pkg@1.2.3`); unpinned ones
+  are warned, since an MCP server runs with your user's permissions.
+- The agents cannot write these files themselves: they are in the guard's policy list and the
+  `deny` rules (`.mcp.json` inside a project still asks).
 
 ## Connect a project
 ```sh
@@ -113,5 +142,5 @@ variables). The repos name variables, never their values. Details and the leak p
 [docs/security.md](docs/security.md).
 
 ## Next phases (not implemented)
-Minimal MCP `propose_memory`/`search_memory`, real LiteLLM gateway, local-embeddings index
+Per-project MCP (`project-memories/<p>/mcp.json` → `.mcp.json`), minimal MCP `propose_memory`/`search_memory`, real LiteLLM gateway, local-embeddings index
 regenerated from the Markdown.

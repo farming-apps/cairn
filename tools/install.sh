@@ -10,7 +10,7 @@
 #                          Without it, and with no env file, memory is expected inside this repo (single-repo layout).
 #   --dry-run              show what would be done without touching anything
 #   --yes                  install missing tools (gitleaks, jq) with Homebrew without asking
-#   --module <m>           comma-separated modules to run: hardening, memory, projects, all (default: all)
+#   --module <m>           comma-separated modules to run: hardening, memory, mcp, projects, all (default: all)
 #   --claude|--no-claude   force or skip Claude Code (default: auto)
 #   --gemini|--no-gemini   force or skip Antigravity CLI / Gemini (default: auto)
 #   --copilot|--no-copilot force or skip GitHub Copilot CLI (default: auto)
@@ -22,6 +22,8 @@
 #              (built-in Copilot disabled for .env, credentials and other sensitive file types)
 #   memory     global/profile.private.md, global instructions (CLAUDE.md, GEMINI.md,
 #              copilot-instructions.md) and global skills (skills/* -> ~/.claude, ~/.gemini, ~/.copilot)
+#   mcp        renders mcp/servers.json of the memory repo into each installed client (only the
+#              entries it manages; see tools/render-mcp.py)
 #   projects   ~/.config/ai-memory/projects.yml template and sync of active registered projects
 set -euo pipefail
 
@@ -60,8 +62,8 @@ has_module() {
 }
 for m in ${MODULES//,/ }; do
   case "$m" in
-    all|hardening|memory|projects) ;;
-    *) echo "install: unknown module '$m' (expected: hardening, memory, projects, all)" >&2; exit 2 ;;
+    all|hardening|memory|mcp|projects) ;;
+    *) echo "install: unknown module '$m' (expected: hardening, memory, mcp, projects, all)" >&2; exit 2 ;;
   esac
 done
 
@@ -322,6 +324,27 @@ if has_module memory; then
     link_global_skills "$COPILOT_DIR/skills"
   else
     say "  skipped (copilot not installed; use --copilot to force it)"
+  fi
+fi
+
+# =============================================================================================
+# MODULE: MCP (one catalog in the memory repo, rendered into each installed client)
+# =============================================================================================
+if has_module mcp; then
+  say
+  say "=== Module: mcp ==="
+  mcp_clients=()
+  has_claude && mcp_clients+=(claude)
+  has_gemini && mcp_clients+=(agy)
+  has_copilot && mcp_clients+=(copilot)
+  has_vscode && mcp_clients+=(vscode)
+  if [ "${#mcp_clients[@]}" -eq 0 ]; then
+    say "  skipped (no AI client installed)"
+  else
+    mcp_args=(--catalog "$DATA/mcp/servers.json" --state "$LOCAL_DIR/mcp-managed.json"
+              --copilot-dir "$COPILOT_DIR" --vscode-dir "$VSCODE_DIR" --clients "$(IFS=,; echo "${mcp_clients[*]}")")
+    [ "$DRY" -eq 1 ] && mcp_args+=(--dry-run)
+    python3 -I "$ROOT/tools/render-mcp.py" "${mcp_args[@]}" || [ $? -eq 3 ]
   fi
 fi
 

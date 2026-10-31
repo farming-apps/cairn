@@ -121,8 +121,9 @@ ENVFILE_RX = re.compile(r"(^|/)\.env(\.(?!example$|sample$|template$|dist$)[^/]+
 KEYFILE_RX = re.compile(r"(^|/)(id_(rsa|ed25519|ecdsa|dsa)|[^/]+\.(pem|key|p12|pfx|kdbx|keystore|jks))$", re.I)
 POLICY_RX = re.compile(
     r"^(~/\.claude/(settings(\.local)?\.json|CLAUDE\.md|hooks(/.*)?|managed-settings\.json)|~/\.claude\.json"
-    r"|~/\.gemini/(GEMINI\.md|AGENTS\.md|config/hooks\.json|antigravity-cli/settings\.json)"
-    r"|~/\.copilot/(hooks(/.*)?|permissions-config\.json|settings\.json)"
+    r"|~/\.gemini/(GEMINI\.md|AGENTS\.md|config/hooks\.json|config/mcp_config\.json|antigravity-cli/settings\.json)"
+    r"|~/\.copilot/(hooks(/.*)?|permissions-config\.json|settings\.json|mcp-config\.json)"
+    r"|~/Library/Application Support/Code/User/mcp\.json|~/\.config/Code/User/mcp\.json"   # MCP servers run commands
     r"|~/\.config/(ai-memory|git-projects)(/.*)?"   # ai-memory machine config (env, registry, forbidden terms): edited by hand only
     r"|(.*/)?guard-bash\.py)$", re.I)
 AGENT_RX = re.compile(
