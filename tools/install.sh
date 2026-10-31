@@ -10,7 +10,7 @@
 # checked out in this clone. Re-run it after merging to update the installed copy.
 #
 # Usage: install.sh [--data <path>] [--dev] [--dry-run] [--yes] [--module <m>] [--claude|--no-claude] [--gemini|--no-gemini] [--copilot|--no-copilot] [--vscode|--no-vscode]
-#   --data <path>          where the memory repository lives (global/, project-memories/, skills/...).
+#   --data <path>          where the memory repository lives (global/, projects/, skills/...).
 #                          Remembered in ~/.config/ai-memory/env; created from templates/data/ if missing.
 #                          Without it, and with no env file, memory is expected inside this repo (single-repo layout).
 #   --dev                  install from this clone as it is (current branch, uncommitted changes), no worktree

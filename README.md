@@ -6,7 +6,7 @@ versioned in Git; clients load it at startup via `@path` imports, so a new chat 
 
 Two repositories:
 - **this one, the tool** (public): scripts, client policies, hooks and the skeleton of a memory repo.
-- **your memory repo** (private): `global/`, `project-memories/`, `skills/`, `prompts/`, `presets/`.
+- **your memory repo** (private): `global/`, `projects/`, `skills/`, `prompts/`, `presets/`.
   Created from `templates/data/` by `install.sh --data <path>`; the tools find it through
   `AI_MEMORY_PROJECTS_DATA` or `~/.config/ai-memory/env`. Without either, memory is expected inside this repo
   (single-repo layout, as in early versions).
@@ -15,7 +15,7 @@ Two repositories:
 ```
 templates/data/    skeleton of the memory repo (copied by install.sh --data):
   global/            rules for every session (AGENTS.md ≤ 400 tokens) + private profile (not versioned)
-  project-memories/  <p>/AGENTS.md (conventions) · state.md (≤ 1,500) · architecture.md · decisions.md · pending/ · skills/
+  projects/  <p>/AGENTS.md (conventions) · state.md (≤ 1,500) · architecture.md · decisions.md · memory/ · skills/
   skills/            shared global skills (<skill>/SKILL.md) linked into Claude, Agy and Copilot
   prompts/           reusable prompts
   presets/           which model for which task, no keys
@@ -78,11 +78,11 @@ tools/new-project.sh my-app ~/dev/my-app
 tools/projects.sh list
 tools/projects.sh sync
 ```
-Creates `<data>/project-memories/my-app/` from the template and prepares the work repo for **Claude Code**, **Antigravity CLI (`agy`)** and **GitHub Copilot CLI (`copilot`)** at the same time — all excluded via `.git/info/exclude` so `git status` stays clean:
-- `CLAUDE.local.md` and `.claude/settings.local.json` (`autoMemoryDirectory` → `project-memories/my-app/pending/`)
+Creates `<data>/projects/my-app/` from the template and prepares the work repo for **Claude Code**, **Antigravity CLI (`agy`)** and **GitHub Copilot CLI (`copilot`)** at the same time — all excluded via `.git/info/exclude` so `git status` stays clean:
+- `CLAUDE.local.md` and `.claude/settings.local.json` (`autoMemoryDirectory` → `projects/my-app/memory/`)
 - `GEMINI.md` (or `.agents/rules/ai-memory.md` if the repo already tracks `GEMINI.md`)
 - `.github/instructions/ai-memory.instructions.md` → `<data>/build/my-app/copilot.instructions.md`
-- `.claude/skills/*` and `.agents/skills/*` → shared skills from `skills/` and `project-memories/my-app/skills/`
+- `.claude/skills/*` and `.agents/skills/*` → shared skills from `skills/` and `projects/my-app/skills/`
 With `--agents` it also links a flat `AGENTS.md` for OpenCode/Codex/Aider. Re-running it (or
 `projects.sh sync`) after moving the memory repo repairs the bridges: imports to the old path are dropped.
 `projects.yml` fields: `path`, `status` (`active` is synced; `paused`/`archived` are listed only), `agents`,
@@ -93,9 +93,9 @@ as `remote:` are ignored, so a repo manifest kept in your dotfiles can double as
 ## Daily flow
 - The model reads `state.md` at start. You keep it short; stable content goes to `architecture.md`,
   closed items to `decisions.md`.
-- The model **does not write** to those files. What it proposes lands in `pending/` (git-ignored).
+- The model **does not write** to those files. What it proposes lands in `memory/` (git-ignored).
 - You review and promote: `tools/promote.sh my-app state` (or `decisions`), which runs `sanitize.py`
-  and checks the token limit before appending anything. `--clear` empties `pending/`.
+  and checks the token limit before appending anything. `--clear` empties `memory/`.
 - Commit in the memory repo → the hook runs `gitleaks`, `sanitize.py` and `check-size.sh` on what is *staged*.
 - On another machine: `git pull` the memory repo; the next session already sees it.
 
@@ -112,7 +112,7 @@ as `remote:` are ignored, so a repo manifest kept in your dotfiles can double as
   instructions if you want it there.
 
 ## Token limits
-`global/AGENTS.md` 400 · `project-memories/*/AGENTS.md` 800 · `state.md` 1,500 · everything else 3,000.
+`global/AGENTS.md` 400 · `projects/*/AGENTS.md` 800 · `state.md` 1,500 · everything else 3,000.
 With 8K-context local models these limits matter more than with Claude or Gemini.
 
 ## Security

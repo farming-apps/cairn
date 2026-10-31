@@ -285,7 +285,7 @@ if has_module memory; then
   if [ ! -d "$DATA" ]; then
     fail "memory repo $DATA does not exist (tools/install.sh --data $DATA creates it)"
   elif git -C "$DATA" rev-parse --git-dir >/dev/null 2>&1; then
-    git -C "$DATA" check-ignore -q project-memories/x/pending/x.md && ok "pending/ ignored" || fail "project-memories/*/pending/ is not ignored in $DATA"
+    git -C "$DATA" check-ignore -q projects/x/memory/x.md && ok "memory/ ignored" || fail "projects/*/memory/ is not ignored in $DATA"
     git -C "$DATA" check-ignore -q global/profile.private.md && ok "profile.private.md ignored" || fail "global/profile.private.md is not ignored in $DATA"
     remote="$(git -C "$DATA" remote get-url origin 2>/dev/null || true)"
     [ -n "$remote" ] && ok "memory remote: ${remote%%:*}…" || warn "memory repo has no remote configured (backup pending)"

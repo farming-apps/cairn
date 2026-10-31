@@ -3,10 +3,10 @@
 #
 #   ROOT        this repository (the tool): tools/, settings/, templates/, .githooks/
 #   LOCAL_DIR   per-machine config, never versioned ($AI_MEMORY_LOCAL or ~/.config/ai-memory)
-#   DATA        the memory repository: global/, project-memories/, skills/, prompts/, presets/, build/
+#   DATA        the memory repository: global/, projects/, skills/, prompts/, presets/, build/
 #               resolved from, in order: $AI_MEMORY_PROJECTS_DATA, the AI_MEMORY_PROJECTS_DATA line in $LOCAL_DIR/env,
 #               and finally $ROOT itself (single-repo layout, as before the split)
-#   PM_DIR      $DATA/project-memories        BUILD_DIR  $DATA/build (git-ignored bundles)
+#   PM_DIR      $DATA/projects        BUILD_DIR  $DATA/build (git-ignored bundles)
 #   INSTALL_DIR the installed copy: a detached worktree of origin/main made by install.sh
 #               ($AI_MEMORY_INSTALL_DIR or ~/.local/share/ai-memory); client hooks point there
 #   ROOT_TILDE / DATA_TILDE   the same with $HOME written as ~ (agy documents ~/ paths in its includes)
@@ -33,7 +33,7 @@ set_data() { # path  — (re)points DATA and the paths derived from it; install.
   DATA="${1/#\~/$HOME}"
   [ -d "$DATA" ] && DATA="$(cd "$DATA" && pwd -P)"
   DATA_TILDE="$(tilde_path "$DATA")"
-  PM_DIR="$DATA/project-memories"
+  PM_DIR="$DATA/projects"
   BUILD_DIR="$DATA/build"
   export AI_MEMORY_PROJECTS_DATA="$DATA"   # child scripts (projects.sh -> new-project.sh -> build.sh) see the same memory repo
 }
@@ -46,3 +46,10 @@ data_is_separate() { [ "$DATA" != "$ROOT" ]; }
 hook_root() {
   if [ -f "$INSTALL_DIR/tools/guard-bash.py" ]; then (cd "$INSTALL_DIR" && pwd -P); else printf '%s' "$ROOT"; fi
 }
+
+# Layout before projects/<p>/memory/ was project-memories/<p>/pending/: say how to migrate, once per run.
+if [ -d "$DATA/project-memories" ] && [ ! -d "$PM_DIR" ] && [ -z "${_AI_MEMORY_OLD_LAYOUT_WARNED:-}" ]; then
+  export _AI_MEMORY_OLD_LAYOUT_WARNED=1
+  echo "ai-memory: $DATA uses the old layout (project-memories/<p>/pending/); migrate it to projects/<p>/memory/:" >&2
+  echo "  git -C '$DATA' mv project-memories projects, then rename every projects/<p>/pending to memory" >&2
+fi
