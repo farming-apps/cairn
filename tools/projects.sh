@@ -97,8 +97,10 @@ for sec, projs in raw_data.items():
         agents = "1" if str(cfg.get("agents", "")).lower() in ("true", "1", "yes") else "0"
         # memory: false -> registered repo without ai-memory bridges or project memory (default true)
         memory = "0" if str(cfg.get("memory", "true")).lower() in ("false", "0", "no") else "1"
+        # kind: workspace -> a plain folder holding several repos; one memory for the whole folder
+        kind = "workspace" if str(cfg.get("kind", "")).strip().lower() == "workspace" else "repo"
         notes = str(cfg.get("notes", "")).replace("\t", " ").strip()
-        print(f"{sec}\t{name}\t{st}\t{p}\t{p_exp}\t{agents}\t{memory}\t{notes}")
+        print(f"{sec}\t{name}\t{st}\t{p}\t{p_exp}\t{agents}\t{memory}\t{kind}\t{notes}")
 PY
 }
 
@@ -111,13 +113,15 @@ case "$cmd" in
     printf '%-12s %-18s %-9s %-12s %-8s %s\n' "SECTION" "PROJECT" "STATUS" "REPO" "MEMORY" "PATH / NOTES"
     printf '%-12s %-18s %-9s %-12s %-8s %s\n' "-------" "-------" "------" "----" "------" "------------"
     found=0
-    while IFS=$'\t' read -r sec name st p p_exp agents mem notes; do
+    while IFS=$'\t' read -r sec name st p p_exp agents mem kind notes; do
       [ -n "$name" ] || continue
       found=1
       if [ -z "$p_exp" ]; then
         repo_st="no-path"
       elif [ ! -d "$p_exp" ]; then
         repo_st="missing"
+      elif [ "$kind" = "workspace" ]; then
+        repo_st="workspace"
       elif ! git -C "$p_exp" rev-parse --git-dir >/dev/null 2>&1; then
         repo_st="not-git"
       elif [ -n "$(git -C "$p_exp" status --porcelain 2>/dev/null)" ]; then
@@ -143,7 +147,7 @@ case "$cmd" in
 
   paths)
     status_filter="${status_filter:-active}"
-    while IFS=$'\t' read -r sec name st p p_exp agents mem notes; do
+    while IFS=$'\t' read -r sec name st p p_exp agents mem kind notes; do
       [ "$mem" = "1" ] && [ -n "$p_exp" ] && [ -d "$p_exp" ] && printf '%s\n' "$p_exp"
     done < <(parse_projects)
     ;;
@@ -154,7 +158,7 @@ case "$cmd" in
       exit 1
     fi
     status_filter="${status_filter:-active}"
-    while IFS=$'\t' read -r sec name st p p_exp agents mem notes; do
+    while IFS=$'\t' read -r sec name st p p_exp agents mem kind notes; do
       [ -n "$name" ] || continue
       if [ "$mem" = "0" ]; then
         echo "[$sec/$name] memory: false (skipped)"
@@ -168,6 +172,7 @@ case "$cmd" in
         echo "  note: local path $p not found on this machine; syncing memory dir only"
       fi
       [ "$agents" = "1" ] && args+=(--agents)
+      [ "$kind" = "workspace" ] && args+=(--workspace)
       [ "$dry_run" -eq 1 ] && args+=(--dry-run)
       "$ROOT/tools/new-project.sh" "${args[@]}"
     done < <(parse_projects)

@@ -375,7 +375,9 @@ if has_module projects || [ "${#args_repos[@]}" -gt 0 ]; then
     else
       fail "no $copilot_instr for copilot (tools/new-project.sh <name> $repo)"
     fi
-    if [ -n "$(git -C "$repo" status --porcelain -- CLAUDE.local.md .claude/settings.local.json .claude/skills GEMINI.md .agents/rules/ai-memory.md .agents/skills .github/instructions/ai-memory.instructions.md 2>/dev/null)" ]; then
+    if ! git -C "$repo" rev-parse --git-dir >/dev/null 2>&1; then
+      ok "workspace folder (not a git repository: no git status to keep clean)"
+    elif [ -n "$(git -C "$repo" status --porcelain -- CLAUDE.local.md .claude/settings.local.json .claude/skills GEMINI.md .agents/rules/ai-memory.md .agents/skills .github/instructions/ai-memory.instructions.md 2>/dev/null)" ]; then
       fail "personal files visible in the repo's git status (check .git/info/exclude)"
     else
       ok "git status clean of personal files"

@@ -55,6 +55,31 @@ and merges `settings/claude/settings.json` into `~/.claude/settings.json` while 
 `model`, `permissions.allow`, your own hooks). In a new session, check with `/context` that the files
 appear under *Memory files* and with `/hooks` that `guard-bash` is active.
 
+## Environment variables
+All optional. Export them in `~/.zshrc` or similar; no script loads `.env.example`.
+
+| Variable | Read by | Purpose | Default |
+|---|---|---|---|
+| `AI_MEMORY_PROJECTS_DATA` | every script (via `tools/lib.sh`), `tools/ai` | Path of the memory repo: `global/`, `project-memories/`, `skills/` | the `AI_MEMORY_PROJECTS_DATA` line in `$AI_MEMORY_LOCAL/env` (written by `install.sh --data`), else this repo |
+| `AI_MEMORY_LOCAL` | every script | Per-machine config dir, never versioned: `forbidden-terms.txt`, `env`, `projects.yml` | `~/.config/ai-memory` |
+| `AI_MEMORY_PROJECTS` | `projects.sh`, `doctor.sh` | Path of the projects registry | `$AI_MEMORY_LOCAL/projects.yml` |
+| `AI_MEMORY_PROJECTS_ENC` | `projects.sh encrypt/decrypt` | Default path of the encrypted registry backup | none (pass it as an argument) |
+| `AI_MEMORY_GUARD_NEUTRAL` | `guard-bash.py` (agy only) | Decision returned to agy when the guard has no objection | `ask` |
+| `AI_MEMORY_CHARS_PER_TOKEN` | `check-size.sh` | Characters per token for the size estimate | `4` |
+| `AI_ENDPOINT` | `tools/ai` | OpenAI-compatible base URL | `$OLLAMA_HOST/v1`, else `http://localhost:11434/v1` |
+| `AI_MODEL` | `tools/ai` | Model name on the server | required |
+| `AI_API_KEY_VAR` | `tools/ai` | NAME of the variable that holds the key, never the key itself | none |
+
+To run the tools from any directory, point a variable of your own at this repo and call the scripts
+by full path (or alias them). The scripts find `lib.sh` next to themselves, so do not symlink single
+scripts into another `PATH` directory:
+```sh
+export AI_MEMORY_HOME=~/ai-memory          # read by no script; only for your shell
+alias ai-install="$AI_MEMORY_HOME/tools/install.sh"
+alias ai-doctor="$AI_MEMORY_HOME/tools/doctor.sh"
+```
+If you move this repo, update that variable and re-run `install.sh`: client hooks store its absolute path.
+
 ## Portable permission policy
 `settings/claude/settings.json` holds what you never want any model to do on any machine:
 `rm -rf` on `/`, `~` or outside the project, reading `~/.ssh`, `~/.aws` or `.env`, editing its own
@@ -109,6 +134,16 @@ With `--agents` it also links a flat `AGENTS.md` for OpenCode/Codex/Aider. Re-ru
 `memory: false` (registered repo with no ai-memory bridges or project memory) and `notes`. Unknown keys such
 as `remote:` are ignored, so a repo manifest kept in your dotfiles can double as the registry: set
 `AI_MEMORY_PROJECTS` to its path.
+
+**Workspaces.** When you open the client in a plain folder that holds several repos, the client reads
+the bridges and `autoMemoryDirectory` of that folder, not of the repos inside it. Connect the folder
+itself with one memory for all of them:
+```sh
+tools/new-project.sh my-course ~/dev/my-course --workspace
+```
+or in `projects.yml` add `kind: workspace` to its entry, and `memory: false` to the inner repos you only
+use from there. The bridges are the same; step 8 is skipped because a folder outside git has nothing to
+exclude. If you later work inside one of those repos directly, drop its `memory: false` and sync.
 
 ## Daily flow
 - The model reads `state.md` at start. You keep it short; stable content goes to `architecture.md`,
