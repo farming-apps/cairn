@@ -24,6 +24,8 @@
       "read_file(.env)",
       "write_file({{HOME}}/.gemini/antigravity-cli/settings.json)",
       "write_file({{HOME}}/.gemini/config/hooks.json)",
+      "write_file({{HOME}}/.gemini/config/mcp_config.json)",
+      "write_file({{HOME}}/.copilot/mcp-config.json)",
       "write_file({{HOME}}/.gemini/GEMINI.md)",
       "write_file({{HOME}}/.claude/settings.json)",
       "write_file({{HOME}}/.claude/settings.local.json)",

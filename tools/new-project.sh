@@ -4,10 +4,12 @@
 # its git status: all personal bridges and skills go to .git/info/exclude.
 # Re-running it on a repo repairs the bridges: lines pointing at a previous memory path are dropped.
 #
-# Usage: new-project.sh <name> [repo-path] [--agents] [--dry-run]
+# Usage: new-project.sh <name> [repo-path] [--agents] [--workspace] [--dry-run]
 #   --agents   also creates <repo>/AGENTS.md as a symlink to the flat bundle (build/<name>/AGENTS.md)
 #              for clients without imports (OpenCode, Codex, Aider). Opt-in: many teams already
 #              version their own AGENTS.md.
+#   --workspace  the path is a plain folder that holds several repos, not a git repository itself.
+#              Same bridges, one memory for the whole folder; nothing to exclude, so step 8 is skipped.
 #
 # In the work repo it writes (all excluded in .git/info/exclude):
 #   CLAUDE.local.md                              Claude Code imports of AGENTS.md and state.md
@@ -18,17 +20,18 @@
 set -euo pipefail
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-name=""; repo=""; AGENTS=0; DRY=0
+name=""; repo=""; AGENTS=0; DRY=0; WORKSPACE=0
 for a in "$@"; do
   case "$a" in
     --agents) AGENTS=1 ;;
+    --workspace) WORKSPACE=1 ;;
     --dry-run) DRY=1 ;;
-    -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
     -*) echo "new-project: unknown argument: $a" >&2; exit 2 ;;
     *) if [ -z "$name" ]; then name="$a"; elif [ -z "$repo" ]; then repo="$a"; else echo "new-project: too many arguments" >&2; exit 2; fi ;;
   esac
 done
-[ -n "$name" ] || { sed -n '2,16p' "$0"; exit 2; }
+[ -n "$name" ] || { sed -n '2,18p' "$0"; exit 2; }
 case "$name" in *[!A-Za-z0-9._-]*|_template) echo "new-project: invalid name: $name" >&2; exit 2 ;; esac
 
 say() { printf '%s\n' "$*"; }
@@ -52,9 +55,14 @@ fi
 [ -n "$repo" ] || { say "Done. To connect a repo: new-project.sh $name <repo-path>"; exit 0; }
 
 repo="$(cd "$repo" && pwd -P)"
-git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || { echo "new-project: $repo is not a git repository" >&2; exit 1; }
-exclude_file="$(git -C "$repo" rev-parse --git-path info/exclude)"
-case "$exclude_file" in /*) ;; *) exclude_file="$repo/$exclude_file" ;; esac
+exclude_file=""
+if git -C "$repo" rev-parse --git-dir >/dev/null 2>&1; then
+  exclude_file="$(git -C "$repo" rev-parse --git-path info/exclude)"
+  case "$exclude_file" in /*) ;; *) exclude_file="$repo/$exclude_file" ;; esac
+elif [ "$WORKSPACE" -eq 0 ]; then
+  echo "new-project: $repo is not a git repository (use --workspace for a folder that holds several repos)" >&2
+  exit 1
+fi
 excluded=()
 
 ensure_line() { # file line
@@ -191,8 +199,12 @@ else
 fi
 
 say "8. .git/info/exclude"
-for e in "${excluded[@]}"; do ensure_line "$exclude_file" "$e"; done
-say "  excluded: ${excluded[*]}"
+if [ -n "$exclude_file" ]; then
+  for e in "${excluded[@]}"; do ensure_line "$exclude_file" "$e"; done
+  say "  excluded: ${excluded[*]}"
+else
+  say "  skipped (workspace folder, not a git repository: nothing to exclude)"
+fi
 
 say
 say "Done. Project '$name' is ready in $repo for Claude Code, Antigravity CLI (agy) and GitHub Copilot CLI."

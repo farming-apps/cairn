@@ -8,6 +8,7 @@
 #   status:  active (default) | paused | archived
 #   agents:  true | false (optional; passes --agents to tools/new-project.sh)
 #   memory:  true (default) | false (registered, but no ai-memory bridges or project memory)
+#   kind:    repo (default) | workspace (a plain folder holding several repos; one memory for all)
 #   notes:   short description (optional)
 # Other keys (e.g. remote: for a clone script in your dotfiles) are ignored, so one manifest can
 # serve both repos: point $AI_MEMORY_PROJECTS at it.
@@ -32,3 +33,6 @@ section3:
   #   path: ~/section3/project-d
   #   memory: false
   #   notes: cloned here, no AI memory
+  # course:
+  #   path: ~/section3/course        # folder with several repos, not a repo itself
+  #   kind: workspace

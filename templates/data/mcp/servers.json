@@ -1,0 +1,11 @@
+{
+  "servers": {
+    "example": {
+      "enabled": false,
+      "clients": ["claude", "agy", "copilot", "vscode"],
+      "command": "npx",
+      "args": ["-y", "@scope/example-mcp@1.0.0"],
+      "env": { "EXAMPLE_API_KEY": "${EXAMPLE_API_KEY}" }
+    }
+  }
+}
