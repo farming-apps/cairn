@@ -37,11 +37,34 @@ their client's syntax: `CLAUDE.md` → `@AGENTS.md` (Claude Code); `GEMINI.md` �
 ## Install on a machine
 Requirements: `git` and `python3` (3.9+, standard library only). On macOS both come with the Xcode
 Command Line Tools (`xcode-select --install`).
+
+Install a **release** into a stable path that you do not develop in: client hooks store this absolute
+path, so uncommitted work in a dev clone would otherwise run live in every session.
 ```sh
-git clone <tool-repo> ~/ai-memory                        # any path works
-~/ai-memory/tools/install.sh --data ~/ai-memory-data     # creates the memory repo if missing, or clone yours first
-~/ai-memory/tools/doctor.sh                              # --module hardening,memory,projects (all by default)
+git clone --branch vX.Y.Z <tool-repo> ~/.local/share/ai-memory          # latest tag from the Releases page
+~/.local/share/ai-memory/tools/install.sh --data ~/ai-memory-data      # creates the memory repo if missing, or clone yours first
+~/.local/share/ai-memory/tools/doctor.sh                               # --module hardening,memory,projects (all by default)
 ```
+Develop in a different clone (or a `git worktree`) of the same repo.
+
+### Update
+```sh
+~/.local/share/ai-memory/tools/update.sh            # latest release: checkout the tag, then re-run install.sh
+~/.local/share/ai-memory/tools/update.sh --check    # only report (doctor.sh does this too)
+~/.local/share/ai-memory/tools/update.sh --to v0.1.0  # pin or roll back
+~/.local/share/ai-memory/tools/update.sh --channel main  # follow main instead of releases
+```
+`update.sh` refuses to move a clone with uncommitted changes or local commits. Your memory repo is
+never committed to: skeleton files added by a new release are listed and copied only if you accept,
+and layout migrations (`migrations/NNN-*.sh`, see `migrations/README.md`) run only after asking. Both
+leave changes unstaged for you to review with `git status` and commit. The layout of the memory repo
+is the integer in `<data>/.ai-memory-layout` (missing means 1); a tool that is too old for it stops.
+
+### Releasing
+Commits to `main` follow [Conventional Commits](https://www.conventionalcommits.org): `fix:` → patch,
+`feat:` → minor, `feat!:` or `BREAKING CHANGE:` → major. The `release` workflow (release-please) keeps
+a release PR open; merging it bumps `VERSION`, updates `CHANGELOG.md` and tags `vX.Y.Z`, which is what
+`update.sh` installs.
 `--data` is remembered in `~/.config/ai-memory/env`; later runs do not need it. On a second machine,
 clone your private memory repo first and point `--data` at it.
 None of the three supported AI clients (**Claude Code**, **Antigravity CLI `agy`**, **GitHub Copilot CLI `copilot`**) is mandatory: `install.sh` and `doctor.sh` auto-detect which ones are installed on the machine and skip the rest without failing. You can also run a single module with `--module hardening`, `--module memory`, or `--module projects`.
