@@ -10,7 +10,7 @@
 # values are current_context_used_percentage, current_context_tokens and displayed_context_limit;
 # total_input/output_tokens are session cumulative (ignored) and cost has no USD, only
 # total_premium_requests (shown as "N premium"). No rate_limits, effort or agent fields.
-# Configured from settings/{claude,agy,copilot}/settings.json (statusLine key) via tools/install.sh.
+# Configured from <data>/settings/{claude,agy,copilot}/settings.json (statusLine key) via tools/install.sh.
 # Manual test:  echo '{}' | tools/statusline.sh
 set -u
 export LC_ALL=C

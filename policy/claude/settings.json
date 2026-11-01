@@ -1,6 +1,5 @@
 {
   "permissions": {
-    "defaultMode": "plan",
     "deny": [
       "Bash(rm -rf /*)",
       "Bash(rm -fr /*)",
@@ -50,6 +49,8 @@
       "Edit(~/.gemini/antigravity-cli/settings.json)",
       "Edit(~/.gemini/config/hooks.json)",
       "Edit(~/.gemini/GEMINI.md)",
+      "Edit(/{{AI_MEMORY_ROOT}}/policy/**)",
+      "Edit(/{{AI_MEMORY_DATA}}/settings/**)",
       "Edit(~/.config/ai-memory/**)",
       "Edit(~/.config/git-projects/**)",
       "Edit(~/.ssh/**)",
@@ -102,15 +103,5 @@
         ]
       }
     ]
-  },
-  "statusLine": {
-    "type": "command",
-    "command": "bash \"{{AI_MEMORY_ROOT}}/tools/statusline.sh\" # ai-memory",
-    "padding": 0
-  },
-  "attribution": {
-    "commit": "",
-    "pr": "",
-    "sessionUrl": false
   }
 }

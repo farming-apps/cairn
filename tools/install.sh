@@ -192,7 +192,7 @@ tool_version() { # name -> first line of its version output, or empty
 }
 confirm() { # question -> 0 to proceed. --yes and --dry-run proceed; no terminal -> skip.
   [ "$YES" -eq 1 ] || [ "$DRY" -eq 1 ] && return 0
-  if [ ! -t 0 ]; then say "  skipped: no terminal to ask; re-run with --yes to install it"; return 1; fi
+  if [ ! -t 0 ]; then say "  skipped: no terminal to ask; re-run with --yes to accept"; return 1; fi
   printf '%s [y/N] ' "$1"; read -r reply
   case "$reply" in y|Y|yes|YES) return 0 ;; *) say "  skipped"; return 1 ;; esac
 }
@@ -242,11 +242,28 @@ if has_module hardening; then
   fi
   copy_if_absent "$ROOT/templates/forbidden-terms.txt" "$LOCAL_DIR/forbidden-terms.txt"
 
+  # Policy = floor (policy/, shipped with the tool, never weakened) + the user's preferences
+  # (<data>/settings/, can only add). Uncommitted preference changes are shown and need a yes:
+  # a model that edited them must not get them applied silently.
+  PREFS_OK=1
+  if data_is_separate && git -C "$DATA" rev-parse --git-dir >/dev/null 2>&1 \
+     && [ -n "$(git -C "$DATA" status --porcelain -- settings)" ]; then
+    say "  warning: uncommitted changes in $DATA/settings (client preferences):"
+    git -C "$DATA" status --short -uall -- settings | sed 's/^/    /'
+    git -C "$DATA" --no-pager diff -- settings | sed 's/^/    /'
+    if ! confirm "  apply them anyway? (no = apply only the policy floor; commit them to stop this check)"; then PREFS_OK=0; fi
+  fi
+  merge_policy() { # floor prefs-rel target
+    local prefs=""
+    [ "$PREFS_OK" -eq 1 ] && prefs="$(data_file "$2")"
+    local margs=("$1" "$prefs" "$3" "$ROOT" --data "$DATA")
+    [ "$DRY" -eq 1 ] && margs+=(--dry-run)
+    python3 "$ROOT/tools/merge-settings.py" "${margs[@]}" || [ $? -eq 3 ]
+  }
+
   say "2. Claude Code policy (permissions, guard-bash hook and statusLine)"
   if has_claude; then
-    merge_args=("$ROOT/settings/claude/settings.json" "$HOME/.claude/settings.json" "$ROOT")
-    [ "$DRY" -eq 1 ] && merge_args+=(--dry-run)
-    python3 "$ROOT/tools/merge-settings.py" "${merge_args[@]}" || [ $? -eq 3 ]
+    merge_policy "$ROOT/policy/claude/settings.json" settings/claude/settings.json "$HOME/.claude/settings.json"
   else
     say "  skipped (claude not installed; use --claude to force it)"
   fi
@@ -254,11 +271,9 @@ if has_module hardening; then
   say "3. Antigravity CLI / Gemini policy (permissions, guard-bash hook and statusLine)"
   if has_gemini; then
     say "  permissions (antigravity-cli/settings.json)"
-    merge_args=("$ROOT/settings/agy/settings.json" "$HOME/.gemini/antigravity-cli/settings.json" "$ROOT")
-    [ "$DRY" -eq 1 ] && merge_args+=(--dry-run)
-    python3 "$ROOT/tools/merge-settings.py" "${merge_args[@]}" || [ $? -eq 3 ]
+    merge_policy "$ROOT/policy/agy/settings.json" settings/agy/settings.json "$HOME/.gemini/antigravity-cli/settings.json"
     say "  guard-bash hook (config/hooks.json)"
-    merge_args=(--replace-keys "$ROOT/settings/agy/hooks.json" "$HOME/.gemini/config/hooks.json" "$ROOT")
+    merge_args=(--replace-keys "$ROOT/policy/agy/hooks.json" "$HOME/.gemini/config/hooks.json" "$ROOT" --data "$DATA")
     [ "$DRY" -eq 1 ] && merge_args+=(--dry-run)
     python3 "$ROOT/tools/merge-settings.py" "${merge_args[@]}" || [ $? -eq 3 ]
   else
@@ -267,18 +282,14 @@ if has_module hardening; then
 
   say "4. GitHub Copilot CLI policy (statusLine, guard-bash hook and sandbox)"
   if has_copilot; then
-    merge_args=("$ROOT/settings/copilot/settings.json" "$COPILOT_DIR/settings.json" "$ROOT")
-    [ "$DRY" -eq 1 ] && merge_args+=(--dry-run)
-    python3 "$ROOT/tools/merge-settings.py" "${merge_args[@]}" || [ $? -eq 3 ]
+    merge_policy "$ROOT/policy/copilot/settings.json" settings/copilot/settings.json "$COPILOT_DIR/settings.json"
   else
     say "  skipped (copilot not installed; use --copilot to force it)"
   fi
 
   say "5. VS Code policy (built-in Copilot off in sensitive file types)"
   if has_vscode; then
-    merge_args=("$ROOT/settings/vscode/settings.json" "$VSCODE_DIR/settings.json" "$ROOT")
-    [ "$DRY" -eq 1 ] && merge_args+=(--dry-run)
-    python3 "$ROOT/tools/merge-settings.py" "${merge_args[@]}" || [ $? -eq 3 ]
+    merge_policy "$ROOT/policy/vscode/settings.json" settings/vscode/settings.json "$VSCODE_DIR/settings.json"
   else
     say "  skipped (VS Code not installed; use --vscode to force it)"
   fi

@@ -1,21 +1,34 @@
 #!/usr/bin/env python3
-"""Merges a versioned JSON template into the machine's real config file.
+"""Merges the client policy into the machine's real config file.
 
-Normal mode (Claude Code or Antigravity CLI settings.json):
-  - keys whose value is a dict (e.g. `permissions`): merged one level deep; the template's
-    subkeys (deny, ask...) replace the target's and the rest (allow, defaultMode...) are kept.
-  - `hooks`: for each event, managed entries are removed and the template's are added; user hooks
-    are kept. An entry is managed when `# ai-memory` appears in its command: Claude Code format
-    (`{"matcher", "hooks": [{"command"}]}`) or Copilot CLI format (flat `{"bash"|"command"|"args"}`).
-  - any other template key replaces the target's.
+Two sources, combined before touching the target:
+  FLOOR  ai-memory/policy/<client>/...json: the security baseline shipped with the tool
+         (deny/ask rules, guard-bash hooks, sandbox). It can never be weakened.
+  PREFS  <data>/settings/<client>/settings.json: the user's preferences (defaultMode, statusLine,
+         attribution, extra deny/ask...). Optional; it can only add to the floor.
+Combination: lists are united (floor first, extras appended); on any other conflict the floor
+wins; `hooks` come from the floor only (put your own hooks in the client's file directly).
 
---replace-keys mode (Antigravity CLI hooks.json): each top-level template key replaces the
-same-named key in the target; the rest of the file (e.g. the `cmux` key) is left untouched.
+Merge into the target (Claude Code, Antigravity CLI, Copilot CLI or VS Code settings.json):
+  - keys whose value is a dict (e.g. `permissions`): merged one level deep; the combined subkeys
+    (deny, ask...) replace the target's and the rest (allow, defaultMode...) are kept.
+  - `hooks`: for each event, managed entries are removed and the combined ones are added; user
+    hooks are kept. An entry is managed when `# ai-memory` appears in its command: Claude Code
+    format (`{"matcher", "hooks": [{"command"}]}`) or Copilot CLI format (flat `{"bash"|"command"|"args"}`).
+  - any other key replaces the target's.
 
-Template substitutions: {{AI_MEMORY_ROOT}} -> repo root, {{HOME}} -> user's home.
+--replace-keys mode (Antigravity CLI hooks.json): each top-level key replaces the same-named key
+in the target; the rest of the file (e.g. the `cmux` key) is left untouched.
 
-Usage: merge-settings.py [--dry-run] [--replace-keys] TEMPLATE TARGET REPO_ROOT
-Exits 0 if nothing changed, 3 if it did (or would with --dry-run), 1 on error.
+--check mode: makes no change; exits 1 and lists what is missing if the target does not contain
+the floor (every list item present, every other value equal; `hooks` are checked by doctor.sh).
+
+Substitutions in both sources: {{AI_MEMORY_ROOT}} -> tool repo, {{AI_MEMORY_DATA}} -> memory repo
+(--data, default the tool repo), {{HOME}} -> user's home.
+
+Usage: merge-settings.py [--dry-run] [--replace-keys] [--data DIR] FLOOR [PREFS] TARGET REPO_ROOT
+       merge-settings.py --check [--data DIR] FLOOR TARGET REPO_ROOT
+Exits 0 if nothing changed, 3 if it did (or would with --dry-run), 1 on error or failed check.
 """
 import difflib
 import json
@@ -69,23 +82,91 @@ def merge(target, template, replace_keys=False):
     return out
 
 
+def combine(floor, prefs, path=""):
+    """Floor plus preferences: lists united, floor wins elsewhere; hooks only from the floor."""
+    if isinstance(floor, dict) and isinstance(prefs, dict):
+        out = {k: v for k, v in prefs.items() if not (path == "" and k == "hooks")}
+        for key, value in floor.items():
+            out[key] = combine(value, prefs[key], f"{path}.{key}") if key in prefs and key != "hooks" else value
+        return out
+    if isinstance(floor, list) and isinstance(prefs, list):
+        return floor + [x for x in prefs if x not in floor]
+    return floor
+
+
+def missing_floor(floor, target, path=""):
+    """Items of the floor absent from the target (hooks excluded)."""
+    if isinstance(floor, dict):
+        if not isinstance(target, dict):
+            return [f"{path or '/'}: expected an object"]
+        out = []
+        for key, value in floor.items():
+            if path == "" and key == "hooks":
+                continue
+            if key not in target:
+                out.append(f"{path}.{key}: missing")
+            else:
+                out += missing_floor(value, target[key], f"{path}.{key}")
+        return out
+    if isinstance(floor, list):
+        have = target if isinstance(target, list) else []
+        return [f"{path}: missing {x!r}" for x in floor if x not in have]
+    return [] if floor == target else [f"{path}: {target!r}, expected {floor!r}"]
+
+
+def read_template(path, subs):
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    for k, v in subs.items():
+        text = text.replace(k, v)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as e:
+        sys.exit(f"merge-settings: {path} is not valid JSON ({e})")
+
+
 def dump(obj):
     return json.dumps(obj, indent=2, ensure_ascii=False) + "\n"
 
 
 def main(argv):
-    dry = "--dry-run" in argv
-    replace_keys = "--replace-keys" in argv
-    args = [a for a in argv if not a.startswith("--")]
-    if len(args) != 3:
+    flags = {"--dry-run", "--replace-keys", "--check"}
+    args, data = [], None
+    it = iter(argv)
+    for a in it:
+        if a == "--data":
+            data = next(it, None)
+        elif a.startswith("--data="):
+            data = a.split("=", 1)[1]
+        elif a in flags:
+            pass
+        elif a.startswith("--"):
+            sys.exit(f"merge-settings: unknown flag {a}\n{__doc__}")
+        else:
+            args.append(a)
+    dry, replace_keys, check = "--dry-run" in argv, "--replace-keys" in argv, "--check" in argv
+    if len(args) == 3:
+        floor_path, prefs_path, target_path, root = args[0], None, args[1], args[2]
+    elif len(args) == 4 and not check:
+        floor_path, prefs_path, target_path, root = args
+    else:
         sys.exit(__doc__)
-    template_path, target_path, root = args
+    subs = {"{{AI_MEMORY_ROOT}}": root, "{{AI_MEMORY_DATA}}": data or root, "{{HOME}}": os.path.expanduser("~")}
 
-    with open(template_path, encoding="utf-8") as fh:
-        text = fh.read().replace("{{AI_MEMORY_ROOT}}", root).replace("{{HOME}}", os.path.expanduser("~"))
-    template = json.loads(text)
+    floor = read_template(floor_path, subs)
     target = load(target_path)
-    merged = merge(target, template, replace_keys)
+    if check:
+        missing = missing_floor(floor, target)
+        for m in missing:
+            print(f"  missing from {target_path}: {m.lstrip('.')}")
+        return 1 if missing else 0
+
+    prefs = read_template(prefs_path, subs) if prefs_path and os.path.exists(prefs_path) else {}
+    if not isinstance(prefs, dict):
+        sys.exit(f"merge-settings: {prefs_path} must hold a JSON object")
+    if isinstance(prefs.get("hooks"), dict) and prefs["hooks"]:
+        print(f"  warning: {prefs_path} defines hooks; ignored (hooks come from the policy floor only)")
+    merged = merge(target, combine(floor, prefs), replace_keys)
 
     before, after = dump(target) if target else "", dump(merged)
     if before == after:

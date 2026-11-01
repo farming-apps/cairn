@@ -1,30 +1,47 @@
-# settings/
+# policy/
 
-Versioned policy for the AI clients: permissions, hooks and status line. `install.sh` merges it
-into the real files on each machine with `tools/merge-settings.py`.
+The **security floor** for the AI clients: deny/ask permissions, the guard-bash hooks and the
+Copilot sandbox. It ships with the tool and cannot be weakened from the memory repo. Your own
+preferences live in the memory repo, `<data>/settings/<client>/settings.json` (defaults in
+`templates/data/settings/`). `install.sh` combines both and merges the result into the real files
+on each machine with `tools/merge-settings.py`.
 
-| Client | Template | Destination on the machine |
-|--------|----------|----------------------------|
-| Claude Code | `claude/settings.json` | `~/.claude/settings.json` |
-| Antigravity CLI (`agy`) | `agy/settings.json` | `~/.gemini/antigravity-cli/settings.json` (permissions) |
-| Antigravity CLI (`agy`) | `agy/hooks.json` | `~/.gemini/config/hooks.json` (hook) |
-| GitHub Copilot CLI | `copilot/settings.json` | `~/.copilot/settings.json` (status line only) |
-| VS Code | `vscode/settings.json` | `~/Library/Application Support/Code/User/settings.json` (macOS) or `~/.config/Code/User/settings.json`; override with `$VSCODE_USER_DIR` |
+| Client | Floor (here) | Preferences (memory repo) | Destination on the machine |
+|--------|--------------|---------------------------|----------------------------|
+| Claude Code | `claude/settings.json` | `settings/claude/settings.json` | `~/.claude/settings.json` |
+| Antigravity CLI (`agy`) | `agy/settings.json` | `settings/agy/settings.json` | `~/.gemini/antigravity-cli/settings.json` (permissions) |
+| Antigravity CLI (`agy`) | `agy/hooks.json` | — | `~/.gemini/config/hooks.json` (hook) |
+| GitHub Copilot CLI | `copilot/settings.json` | `settings/copilot/settings.json` | `~/.copilot/settings.json` |
+| VS Code | `vscode/settings.json` | `settings/vscode/settings.json` | `~/Library/Application Support/Code/User/settings.json` (macOS) or `~/.config/Code/User/settings.json`; override with `$VSCODE_USER_DIR` |
 
-## What belongs to the repo and what to the machine
-- **Repo** (this directory): `permissions.defaultMode` (every session starts in plan mode),
-  `permissions.deny`, `permissions.ask`, `hooks` marked `# ai-memory`, `statusLine`
-  (`tools/statusline.sh`) and `attribution` (empty `commit`/`pr` and `sessionUrl: false`: no
-  `Co-Authored-By` or "Generated with" lines in commits and PRs; the same rule for every client is in
-  `global/AGENTS.md`). Each `install.sh` replaces them with whatever the template says.
+## Floor, preferences and machine
+- **Floor** (this directory): `permissions.deny`, `permissions.ask`, `hooks` marked `# ai-memory`,
+  Copilot's `sandbox` and VS Code's `github.copilot.enable`/`files.associations`.
+- **Preferences** (`<data>/settings/`): by default `permissions.defaultMode` (every session starts in
+  plan mode), `statusLine` (`tools/statusline.sh`) and `attribution` (empty `commit`/`pr` and
+  `sessionUrl: false`: no `Co-Authored-By` or "Generated with" lines in commits and PRs; the same rule
+  for every client is in `global/AGENTS.md`). You may add any other key, and extra `deny`/`ask` rules.
+- **Combination**: lists are united (floor first, your extras after); on any other conflict the floor
+  wins; `hooks` come from the floor only. Removing a floor rule from your preferences changes nothing.
+  Each `install.sh` replaces the combined keys in the machine file.
 - **Machine** (preserved): `model`, `theme`, `tui`, `permissions.allow` (what you accept with
   "always allow"), your own unmarked hooks, and any other key.
-- Claude Code's own `language` key in `~/.claude/settings.json` is a machine-level setting the
-  template never touches; the repo's language rule lives in the profile's working-language field
+- Claude Code's own `language` key in `~/.claude/settings.json` is a machine-level setting never
+  touched; the repo's language rule lives in the profile's working-language field
   (`global/profile.private.md`) instead.
 
-`{{AI_MEMORY_ROOT}}` is replaced with the real repo path at install time; this way the template
-contains no home paths and passes the gitleaks hook.
+`{{AI_MEMORY_ROOT}}` (tool repo), `{{AI_MEMORY_DATA}}` (memory repo) and `{{HOME}}` are replaced with
+real paths at install time; this way the files contain no home paths and pass the gitleaks hook.
+
+## Why preferences cannot loosen the policy
+The memory repo is where models write (`pending/`), so it must not be able to relax the next install:
+1. **Floor + extras**: the security rules are not in the memory repo at all; preferences can only add.
+2. **Write ban**: the floor denies editing `policy/` and `<data>/settings/` (Claude `Edit(//…)`, agy
+   `write_file(…)`), and `guard-bash.py` denies writing `policy/<client>/` and `settings/<client>/` from
+   the shell. Edit your preferences by hand.
+3. **Review before applying**: if `<data>/settings/` has uncommitted changes, `install.sh` shows the
+   diff and asks; answering no applies only the floor. `doctor.sh` fails if an installed file misses
+   any floor rule (`merge-settings.py --check`).
 
 ## Three layers against destructive operations
 1. `permissions.deny` / `ask`: prefix rules. Fast, but `rm -fr`, `rm -r -f`, `sudo rm` or
@@ -41,8 +58,8 @@ contains no home paths and passes the gitleaks hook.
      `… | curl`, DNS lookups with a computed argument, the macOS Keychain → deny; remote package
      runners (`npx -y`, `uvx`), uploads, tunnels, `ssh host "cmd"`, metadata endpoints → ask.
    - **Sensitive paths** (mirrors the `Read`/`Edit` rules so `cat`/`>` cannot bypass them):
-     credential files → deny; the agent's own policy, `guard-bash.py` and the ai-memory machine
-     config (`~/.config/ai-memory/`, `~/.config/git-projects/`) → deny on write; other
+     credential files → deny; the agent's own policy, `guard-bash.py`, `policy/<client>/`,
+     `<data>/settings/<client>/` and the ai-memory machine config (`~/.config/ai-memory/`, `~/.config/git-projects/`) → deny on write; other
      agents' config, shell rc files, LaunchAgents, git hooks, CI workflows → ask on write.
    - **git as a hook**: `git config`/`-c` on a callback key (`core.fsmonitor`, `core.hooksPath`,
      `credential.helper`, …) → ask, or deny if the value is an inline command; `git worktree add ./.git`,
@@ -57,7 +74,7 @@ contains no home paths and passes the gitleaks hook.
    With `onFailure: block`: if the script does not exist (repo moved), Bash stays blocked until
    you re-run `install.sh`. This is intentional.
 3. `Edit(~/.claude/settings.json)` denied: the model cannot remove its own rules.
-   To change the policy, edit the template here and re-run `install.sh`.
+   To change the policy, edit `policy/` (floor) or `<data>/settings/` (preferences) by hand and re-run `install.sh`.
 
 ## Status line
 `statusLine` runs `tools/statusline.sh` with the session JSON Claude Code sends on stdin
@@ -112,12 +129,13 @@ completion on but turns it off by language id for the types that hold secrets:
 `.env*` to `dotenv`. Copilot's filter is per language, not per path, which is why the associations
 are needed; path-based "content exclusions" exist only in Copilot Business/Enterprise. The merge is
 one level deep: your own entries under both keys are kept. To also silence it in `yaml`, `json` or
-`markdown`, add them to the template with `false`. To turn off every built-in AI feature instead,
+`markdown`, add them with `false` to `<data>/settings/vscode/settings.json`. To turn off every built-in AI feature instead,
 set `chat.disableAIFeatures: true` in your own settings.
 
 ## GitHub Copilot CLI
-`copilot/settings.json` is merged into `~/.copilot/settings.json` (or `$COPILOT_HOME/settings.json`)
-when the `copilot` binary is present. It carries three keys:
+`copilot/settings.json` (floor: hook and sandbox) plus `<data>/settings/copilot/settings.json`
+(preference: status line) are merged into `~/.copilot/settings.json` (or `$COPILOT_HOME/settings.json`)
+when the `copilot` binary is present. Three keys:
 
 - **`statusLine`** → `tools/statusline.sh`, see above. In Copilot CLI 1.0.103 it is a regular setting
   (`copilot help config`); older builds gated it behind `experimental: true` or
@@ -141,8 +159,8 @@ when the `copilot` binary is present. It carries three keys:
   It complements the hook: the guard reads the command text and can be fooled, the sandbox acts when
   the command runs. Expect legitimate commands that leave the repo (installing into the home, writing
   `~/.config`) to fail; Copilot offers a per-command bypass prompt, and `/sandbox disable` turns it off
-  for the current session only. Because the key lives in the template, `install.sh` re-enables it;
-  to opt out on one machine, remove `sandbox` from `copilot/settings.json` locally.
+  for the current session only. Because the key is part of the floor, `install.sh` re-enables it and
+  `doctor.sh` fails without it; to opt out on one machine, remove `sandbox` from `policy/copilot/settings.json` locally.
 
 How Copilot's three layers compare with Claude's:
 1. **Tool permissions** (`--allow-tool` / `--deny-tool shell(git push)`) are session flags, not saved.
@@ -151,7 +169,7 @@ How Copilot's three layers compare with Claude's:
    Patterns are prefix-based with no regex, so they do not replace the guard.
 2. **Path access** is limited to the cwd plus the temp dir (`--add-dir` extends it, `--allow-all-paths`
    disables it); there is no per-path read deny like Claude's `Read(~/.ssh/**)`. The enforceable layer
-   is the sandbox described above, which the template turns on.
+   is the sandbox described above, which the floor turns on.
 3. **The hook** is the equivalent of Claude's guard. Failure semantics: a crash or non-zero exit denies
    (same as our `onFailure: block`), exit code 2 always denies, but a **timeout fails open**, hence
    `timeoutSec: 5`. In autopilot mode `ask` becomes `deny`, so `git push --force` or a relative `rm -r`
@@ -169,7 +187,7 @@ echo '{"tool_name":"Bash","tool_input":{"command":"rm -rf ~/x"},"cwd":"/tmp"}' |
 It is the "Gemini" of this setup (the `agy` binary; Gemini CLI is not installed). It reuses
 `~/.gemini/` but with its own paths and syntax:
 
-- **Permissions** → `agy/settings.json`, merged into `~/.gemini/antigravity-cli/settings.json` under
+- **Permissions** → `agy/settings.json` (plus your `<data>/settings/agy/settings.json`), merged into `~/.gemini/antigravity-cli/settings.json` under
   `permissions.{deny,ask}`; `allow` and `trustedWorkspaces` are preserved. `command(...)`,
   `read_file(...)`, `write_file(...)` rules: token prefix, each part of an `&&`/`;`/`|` chain is
   evaluated separately, and `regex:` nests a regex per token. Deny > Ask > Allow. `{{HOME}}` is
@@ -186,7 +204,7 @@ It is the "Gemini" of this setup (the `agy` binary; Gemini CLI is not installed)
   replies `{"decision": "ask"}` (configurable with `AI_MEMORY_GUARD_NEUTRAL`). `ask` respects
   your `allow` rules and the "Always Allow" cache.
 - **Status line** → the same `tools/statusline.sh` as Claude Code, declared in
-  `agy/settings.json` (`statusLine`). The agy JSON differs only in `cost.total_usd` and
+  `<data>/settings/agy/settings.json` (`statusLine`). The agy JSON differs only in `cost.total_usd` and
   `model.effort`, covered by fallbacks; it sends no duration or 5h/7d limits, which are omitted.
   If you prefer to keep agy's own bar underneath, add `"stack_with_default": true`.
 - **Known limits**: what agy does if the hook fails or is slow is undocumented; that is why the

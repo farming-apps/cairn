@@ -1,0 +1,7 @@
+{
+  "statusLine": {
+    "type": "command",
+    "command": "bash \"{{AI_MEMORY_ROOT}}/tools/statusline.sh\"",
+    "padding": 0
+  }
+}

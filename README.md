@@ -20,12 +20,13 @@ templates/data/    skeleton of the memory repo (copied by install.sh --data):
   prompts/           reusable prompts
   presets/           which model for which task, no keys
   mcp/servers.json   MCP server catalog, rendered into every installed client (no secret values)
+  settings/<client>/ your client preferences (defaultMode, statusLine, attribution, extra deny/ask)
+  gateway/           LiteLLM config for phase 2 (os.environ/... only)
 templates/         templates for local machine files (forbidden-terms.txt, projects.yml)
-gateway/           LiteLLM config for phase 2 (os.environ/... only)
-settings/claude/   Claude Code policy: deny/ask permissions + guard-bash hook + statusLine
-settings/agy/      Antigravity CLI (agy) policy: permissions + guard-bash hook + statusLine
-settings/copilot/  GitHub Copilot CLI policy: guard-bash hook + sandbox + statusLine
-settings/vscode/   VS Code: built-in Copilot off in .env, credentials and other sensitive file types
+policy/claude/     Claude Code security floor: deny/ask permissions + guard-bash hook
+policy/agy/        Antigravity CLI (agy) security floor: permissions + guard-bash hook
+policy/copilot/    GitHub Copilot CLI security floor: guard-bash hook + sandbox
+policy/vscode/     VS Code: built-in Copilot off in .env, credentials and other sensitive file types
 tools/             install · doctor · projects · new-project · promote · build · ai · sanitize · check-size · guard-bash · merge-settings · render-mcp · lib
 .githooks/         pre-commit: gitleaks + sanitize + size (shared by both repos)
 .github/workflows/ the same scan on the remote
@@ -51,7 +52,7 @@ blocks commits without it) and `jq` (status line) are offered for install with H
 before each one; without Homebrew it tells you what to install and goes on. Then it writes an import
 block into `~/.claude/CLAUDE.md` (and `~/.gemini/GEMINI.md` if you use Gemini), enables the hooks in
 both repos, creates `<data>/global/profile.private.md` and `~/.config/ai-memory/forbidden-terms.txt`,
-and merges `settings/claude/settings.json` into `~/.claude/settings.json` while keeping yours (`theme`,
+and merges `policy/claude/settings.json` + `<data>/settings/claude/settings.json` into `~/.claude/settings.json` while keeping yours (`theme`,
 `model`, `permissions.allow`, your own hooks). In a new session, check with `/context` that the files
 appear under *Memory files* and with `/hooks` that `guard-bash` is active.
 
@@ -81,12 +82,13 @@ alias ai-doctor="$AI_MEMORY_HOME/tools/doctor.sh"
 If you move this repo, update that variable and re-run `install.sh`: client hooks store its absolute path.
 
 ## Portable permission policy
-`settings/claude/settings.json` holds what you never want any model to do on any machine:
+`policy/claude/settings.json` holds what you never want any model to do on any machine:
 `rm -rf` on `/`, `~` or outside the project, reading `~/.ssh`, `~/.aws` or `.env`, editing its own
 `settings.json`; and what must always ask: `sudo`, `git push --force`, `git reset --hard`,
 `git clean`. The prefix rules are reinforced by the `tools/guard-bash.py` hook, which analyses each
 command (`rm -fr`, `rm -r -f`, `sh -c "rm -rf …"`, empty variables, `find -delete`, `curl | sh`).
-Details, rationale and how to change it in [settings/README.md](settings/README.md).
+Your memory repo's `settings/` can add rules and preferences but never remove floor rules, and
+models cannot edit either directory. Details, rationale and how to change it in [policy/README.md](policy/README.md).
 
 ## MCP servers
 One catalog, `<data>/mcp/servers.json`, describes the MCP servers you want everywhere; `install.sh
@@ -158,7 +160,7 @@ exclude. If you later work inside one of those repos directly, drop its `memory:
 - **Antigravity CLI (`agy`)**: `install.sh` detects it and writes `~/.gemini/GEMINI.md` (includes
   `@[…](…)`), the permissions in `~/.gemini/antigravity-cli/settings.json` and the hook in
   `~/.gemini/config/hooks.json`. `new-project.sh` leaves a `GEMINI.md` (or `.agents/rules/ai-memory.md`
-  if the team already has one) in the work repo, excluded from git. Details in `settings/README.md`.
+  if the team already has one) in the work repo, excluded from git. Details in `policy/README.md`.
 - **OpenCode / Codex / Aider** do not resolve `@path`: use `tools/build.sh <p>` to generate a flat
   `<data>/build/<p>/AGENTS.md` (or `new-project.sh --agents`).
 - **Ollama / LM Studio / any OpenAI-compatible endpoint**: `tools/ai "question"` loads the current

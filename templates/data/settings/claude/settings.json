@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "defaultMode": "plan"
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash \"{{AI_MEMORY_ROOT}}/tools/statusline.sh\" # ai-memory",
+    "padding": 0
+  },
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
+  }
+}

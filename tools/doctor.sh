@@ -42,6 +42,14 @@ fails=0
 ok()   { printf '  OK   %s\n' "$*"; }
 fail() { printf '  FAIL %s\n' "$*"; fails=$((fails+1)); }
 warn() { printf '  WARN %s\n' "$*"; }
+check_floor() { # client floor target — every rule of policy/<client> must be in the installed file
+  local out
+  if out="$(python3 -I "$ROOT/tools/merge-settings.py" --check --data "$DATA" "$2" "$3" "$ROOT" 2>&1)"; then
+    ok "$1: policy floor complete ($(basename "$(dirname "$2")")/$(basename "$2"))"
+  else
+    fail "$1: policy floor incomplete; re-run tools/install.sh"$'\n'"$out"
+  fi
+}
 
 has_claude=0; has_agy=0; has_copilot=0; has_vscode=0
 if command -v code >/dev/null 2>&1 || [ -f "$VSCODE_DIR/settings.json" ]; then has_vscode=1; fi
@@ -114,12 +122,13 @@ elif root + "/tools/guard-bash.py" not in hooks[0]["command"]:
     print("  FAIL the guard-bash hook points to another path; re-run tools/install.sh"); ok = False
 sl = d.get("statusLine") or {}
 if root + "/tools/statusline.sh" not in (sl.get("command") or ""):
-    print("  FAIL settings.json has no ai-memory statusLine or it points to another path; re-run tools/install.sh"); ok = False
+    print("  WARN settings.json has no ai-memory statusLine (a preference in <data>/settings/claude/settings.json)")
 if ok:
-    print(f"  OK   claude: policy applied ({len(deny)} deny, {len(d['permissions'].get('ask', []))} ask), guard-bash hook, statusLine")
+    print(f"  OK   claude: policy applied ({len(deny)} deny, {len(d['permissions'].get('ask', []))} ask), guard-bash hook")
 sys.exit(0 if ok else 1)
 PY
       then :; else fails=$((fails+1)); fi
+      check_floor claude "$ROOT/policy/claude/settings.json" "$settings"
     else
       fail "claude: $settings does not exist (tools/install.sh)"
     fi
@@ -165,6 +174,7 @@ except Exception as e:
 sys.exit(0 if ok else 1)
 PY
     then :; else fails=$((fails+1)); fi
+    [ -f "$agy_settings" ] && check_floor agy "$ROOT/policy/agy/settings.json" "$agy_settings"
     if echo '{"toolCall":{"name":"run_command","args":{"CommandLine":"rm -rf ~/x"}},"workspacePaths":["/tmp"]}' \
          | python3 -I "$ROOT/tools/guard-bash.py" | grep -q '"deny"'; then
       ok "guard-bash responds in agy format"
@@ -192,7 +202,7 @@ cmd = (d.get("statusLine") or {}).get("command") or ""
 if root + "/tools/statusline.sh" in cmd:
     print("  OK   copilot: statusLine points to tools/statusline.sh")
 else:
-    print("  FAIL copilot: settings.json has no ai-memory statusLine or it points elsewhere; re-run tools/install.sh"); ok = False
+    print("  WARN copilot: no ai-memory statusLine (a preference in <data>/settings/copilot/settings.json)")
 hooks = (d.get("hooks") or {}).get("PreToolUse") or []
 mine = [h for h in hooks if isinstance(h, dict) and "# ai-memory" in (h.get("bash") or h.get("command") or "")]
 if not mine:
@@ -208,6 +218,7 @@ else:
 sys.exit(0 if ok else 1)
 PY
     then :; else fails=$((fails+1)); fi
+    [ -f "$copilot_settings" ] && check_floor copilot "$ROOT/policy/copilot/settings.json" "$copilot_settings"
     if echo '{"tool_name":"Bash","tool_input":{"command":"rm -rf ~/x"},"cwd":"/tmp"}' \
         | python3 -I "$ROOT/tools/guard-bash.py" --out copilot 2>/dev/null | grep -q '^{"permissionDecision": "deny"'; then
       ok "guard-bash responds in copilot format"
@@ -223,7 +234,7 @@ PY
   if [ "$has_vscode" -eq 1 ]; then
     if [ ! -f "$vscode_settings" ]; then
       fail "vscode: $vscode_settings does not exist (tools/install.sh)"
-    elif python3 - "$vscode_settings" "$ROOT/settings/vscode/settings.json" <<'PY'
+    elif python3 - "$vscode_settings" "$ROOT/policy/vscode/settings.json" <<'PY'
 import json, sys
 path, template = sys.argv[1:3]
 try:
@@ -239,6 +250,7 @@ off = sum(1 for v in have.values() if v is False)
 print(f"  OK   vscode: built-in Copilot off in {off} file type(s), on elsewhere")
 PY
     then :; else fails=$((fails+1)); fi
+    [ -f "$vscode_settings" ] && check_floor vscode "$ROOT/policy/vscode/settings.json" "$vscode_settings"
   else
     warn "VS Code not installed (skipped)"
   fi
