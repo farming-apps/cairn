@@ -10,6 +10,7 @@ projects/  one folder per work repo: AGENTS.md · state.md · architecture.md ·
 skills/            shared skills (<skill>/SKILL.md) linked into every client
 prompts/           reusable prompts
 presets/           which model for which task, no keys
+mcp/servers.json   MCP servers for every client (install.sh --module mcp); ${VAR} references, no values
 build/             generated bundles (ignored)
 ```
 The repo names variables, never their values. Nothing written by a model lands outside `memory/`.

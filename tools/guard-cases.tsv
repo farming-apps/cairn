@@ -109,3 +109,9 @@ deny	echo $(echo $(rm -rf ~))
 none	echo '$(rm -rf ~)'
 none	ls $(pwd)
 none	echo "$(git rev-parse --short HEAD)"
+# --- MCP server configs: they run commands, so writing them is policy
+deny	echo {} > ~/.copilot/mcp-config.json
+deny	cp x.json ~/.gemini/config/mcp_config.json
+deny	tee ~/Library/Application\ Support/Code/User/mcp.json < x
+ask	tee .mcp.json < x
+none	cat ~/.copilot/mcp-config.json
