@@ -43,10 +43,11 @@ say "1. project memory: $DATA_TILDE/projects/$name"
 if [ -d "$pdir" ]; then
   say "  ok   already exists, left untouched"
   [ -d "$pdir/memory" ] || { say "  create $name/memory/ (auto-memory)"; run mkdir -p "$pdir/memory"; run touch "$pdir/memory/.gitkeep"; }
+  [ -d "$pdir/plans" ] || { say "  create $name/plans/ (plans left pending)"; run mkdir -p "$pdir/plans"; run touch "$pdir/plans/.gitkeep"; }
 else
   say "  create from templates/data/projects/_template"
   if [ "$DRY" -eq 0 ]; then
-    mkdir -p "$pdir/memory"; touch "$pdir/memory/.gitkeep"
+    mkdir -p "$pdir/memory" "$pdir/plans"; touch "$pdir/memory/.gitkeep" "$pdir/plans/.gitkeep"
     for f in AGENTS.md architecture.md state.md decisions.md; do
       sed "s/<proyecto>/$name/g; s/<AAAA-MM-DD>/$(date +%F)/g" "$template/$f" >"$pdir/$f"
     done

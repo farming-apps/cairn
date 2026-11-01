@@ -15,7 +15,7 @@ Two repositories:
 ```
 templates/data/    skeleton of the memory repo (copied by install.sh --data):
   global/            rules for every session (AGENTS.md ≤ 400 tokens) + private profile (not versioned)
-  projects/  <p>/AGENTS.md (conventions) · state.md (≤ 1,500) · architecture.md · decisions.md · memory/ · skills/
+  projects/  <p>/AGENTS.md (conventions) · state.md (≤ 1,500) · architecture.md · decisions.md · memory/ · plans/ · skills/
   skills/            shared global skills (<skill>/SKILL.md) linked into Claude, Agy and Copilot
   prompts/           reusable prompts
   presets/           which model for which task, no keys

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Claude Code status line. Reads the session JSON from stdin and prints two lines:
 #   [Fable] ai-memory  main*  effort:high  agent:x
-#   [███████░░░] 70% 140k/200k  $0.42 12m  5h 23% 7d 41%  mem: ai-memory · 2 pending · state 16d
+#   [███████░░░] 70% 140k/200k  $0.42 12m  5h 23% 7d 41%  mem: ai-memory · 2 pending · 1 plan · state 16d
 # Context colors: green <70 %, amber >=70 %, red >=85 % (adds "⚠ compact").
 # Fields missing from the JSON (cost, limits, agent...) are omitted; it never fails.
 # Also serves Antigravity CLI (agy): its JSON is almost the same; only
@@ -103,6 +103,8 @@ if [ -n "$pdir" ] && [ -d "$pdir" ]; then
   mem="mem: ${pdir##*/}"
   set -- "$pdir"/memory/*.md
   [ -e "$1" ] && mem="$mem · $# pending"
+  set -- "$pdir"/plans/*.md   # plans saved for later (global/AGENTS.md); executed ones are deleted
+  [ -e "$1" ] && { [ $# -eq 1 ] && mem="$mem · 1 plan" || mem="$mem · $# plans"; }
   if [ -f "$pdir/state.md" ]; then
     mtime="$(stat -f %m "$pdir/state.md" 2>/dev/null || stat -c %Y "$pdir/state.md" 2>/dev/null || echo 0)"
     age=$(( ($(date +%s) - mtime) / 86400 ))

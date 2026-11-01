@@ -34,7 +34,7 @@ on each machine with `tools/merge-settings.py`.
 real paths at install time; this way the files contain no home paths and pass the gitleaks hook.
 
 ## Why preferences cannot loosen the policy
-The memory repo is where models write (`pending/`), so it must not be able to relax the next install:
+The memory repo is where models write (`memory/`, `plans/`), so it must not be able to relax the next install:
 1. **Floor + extras**: the security rules are not in the memory repo at all; preferences can only add.
 2. **Write ban**: the floor denies editing `policy/` and `<data>/settings/` (Claude `Edit(//…)`, agy
    `write_file(…)`), and `guard-bash.py` denies writing `policy/<client>/` and `settings/<client>/` from
@@ -82,13 +82,13 @@ The memory repo is where models write (`pending/`), so it must not be able to re
 
 ```
 [Fable] ai-memory  main*  effort:high
-[███████░░░] 70% 140k/200k  $0.42 12m  5h 23% 7d 41%  mem: ai-memory · 2 pending · state 16d
+[███████░░░] 70% 140k/200k  $0.42 12m  5h 23% 7d 41%  mem: ai-memory · 2 pending · 1 plan · state 16d
 ```
 - Line 1: model, current folder (last component only), branch (`*` if there are uncommitted
   changes), effort level and agent if you are inside a subagent.
 - Line 2: context bar (green <70 %, amber ≥70 %, red ≥85 % with `⚠ compact`), tokens in the
   window / window size, session cost and duration, 5h/7d limits (if your plan sends them) and the
-  project's memory status: name, pending `.md` files in `memory/` and days since `state.md` was
+  project's memory status: name, pending `.md` files in `memory/`, plans waiting in `plans/` and days since `state.md` was
   last touched once past 14. With no associated project it shows `no memory`.
 - Fields missing from the JSON are omitted. With the status line active, Claude Code stops showing
   almost all footer hints (`esc to interrupt`, `? for shortcuts`).
