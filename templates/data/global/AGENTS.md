@@ -11,6 +11,7 @@ Apply in every session, with any model. Most important first.
 - At start, read the project's `state.md` if it exists. Do not ask for context already there.
 - Do not edit `architecture.md`, `state.md` or `decisions.md`. Write proposals to the project's `memory/`; the user reviews and promotes them.
 - One idea per entry, dated, in a few lines.
+- Plans stay where the client keeps them. Save one to the project's `plans/` (next to `state.md`, `YYYY-MM-DD-<slug>.md`) only when it is left pending or the user asks; delete it once executed.
 
 ## Work
 - Reply in the language set as the working language in the profile (`global/profile.private.md`). If it is empty, reply in the language the user writes in. Code, comments and docs stay in English.
