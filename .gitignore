@@ -9,8 +9,8 @@ local/
 
 # Single-repo layout only (memory kept inside this repo): the memory repo has its own .gitignore
 global/profile.private.md
-project-memories/*/pending/*
-!project-memories/*/pending/.gitkeep
+projects/*/memory/*
+!projects/*/memory/.gitkeep
 
 # Generated artifacts (flat bundles for clients without imports)
 build/

@@ -86,13 +86,13 @@ lim=""
 [ -n "$d7" ] && lim="${lim:+$lim }7d ${d7}%"
 [ -n "$lim" ] && l2="$l2  ${DIM}$lim${RESET}"
 
-# Memory project: autoMemoryDirectory (written by new-project.sh) or project-memories/<repo-name>.
+# Memory project: autoMemoryDirectory (written by new-project.sh) or projects/<repo-name>.
 pdir=""
 sl="$proj/.claude/settings.local.json"
 if [ -n "$proj" ] && [ -f "$sl" ]; then
   amd="$(jq -r '.autoMemoryDirectory // ""' "$sl" 2>/dev/null)"
   amd="${amd/#\~/$HOME}"
-  [ -n "$amd" ] && pdir="${amd%/pending}"
+  [ -n "$amd" ] && pdir="${amd%/memory}"
 fi
 if [ -z "$pdir" ] && [ -n "$cur" ]; then
   top="$(git -C "$cur" rev-parse --show-toplevel 2>/dev/null)"
@@ -101,7 +101,7 @@ fi
 mem="no memory"
 if [ -n "$pdir" ] && [ -d "$pdir" ]; then
   mem="mem: ${pdir##*/}"
-  set -- "$pdir"/pending/*.md
+  set -- "$pdir"/memory/*.md
   [ -e "$1" ] && mem="$mem · $# pending"
   if [ -f "$pdir/state.md" ]; then
     mtime="$(stat -f %m "$pdir/state.md" 2>/dev/null || stat -c %Y "$pdir/state.md" 2>/dev/null || echo 0)"

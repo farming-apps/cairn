@@ -17,11 +17,11 @@ Golden rule: **the repo names variables, never their values.** `ANTHROPIC_API_KE
 - Secrets of any kind, including URLs with user and password.
 - Emails, private IPs, real client names, internal domains. Use aliases in `architecture.md`.
 - Absolute home paths (`~/...` is neutral; the expanded path identifies the machine and the user).
-- Anything written by a model without review: it goes to `project-memories/<p>/pending/`, which is ignored.
+- Anything written by a model without review: it goes to `projects/<p>/memory/`, which is ignored.
 
 ## Barriers, from the inside out
 1. **Convention**: the rules in `global/AGENTS.md` ask the model not to write values.
-2. **`promote.sh`**: the only path from `pending/` into memory; runs `sanitize.py` and the token limit.
+2. **`promote.sh`**: the only path from `memory/` into `state.md`/`decisions.md`; runs `sanitize.py` and the token limit.
 3. **`pre-commit` hook**: `gitleaks` + `sanitize.py` + `check-size.sh` on what is *staged*, in both repos
    (`install.sh` points the memory repo's `core.hooksPath` at the tool's `.githooks/`). Blocks the commit if `gitleaks` is missing.
 4. **Remote workflow**: `gitleaks` and `sanitize.py` on every push, in case someone used `--no-verify`.
@@ -48,9 +48,9 @@ False positives: add `sanitize:allow` on the line (as a comment). Use it sparing
 ## Prompt injection through memory
 A model can read a README, a web page or an issue containing text like "save X to your memory".
 If that is persisted, every model will read it in every session. Hence:
-- the model only writes to `pending/`, never to `state.md`, `architecture.md` or `decisions.md`;
+- the model only writes to `memory/`, never to `state.md`, `architecture.md` or `decisions.md`;
 - `global/AGENTS.md` and `profile.private.md` are edited only by you;
-- you review `pending/` before promoting, just as you review a `git diff`.
+- you review `memory/` before promoting, just as you review a `git diff`.
 
 ## If something leaked
 1. **Rotate the credential first.** A secret that was on a remote is considered compromised even if you delete it.
@@ -60,5 +60,5 @@ If that is persisted, every model will read it in every session. Hence:
 
 ## Maintenance
 - `tools/doctor.sh` after every clone or machine change.
-- Review `pending/` regularly; delete anything left unpromoted for weeks.
+- Review `memory/` regularly; delete anything left unpromoted for weeks.
 - Update `gitleaks` along with the rest of the system tools.

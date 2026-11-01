@@ -14,4 +14,4 @@ Global rules are already loaded by the client: do not repeat them.
 - `decisions.md`: history. Check it before proposing something already discarded.
 
 ## Memory
-- Memory proposals go to `pending/`, never to these files.
+- Memory proposals go to `memory/`, never to these files.

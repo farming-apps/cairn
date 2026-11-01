@@ -9,7 +9,7 @@ Apply in every session, with any model. Most important first.
 
 ## Memory
 - At start, read the project's `state.md` if it exists. Do not ask for context already there.
-- Do not edit `architecture.md`, `state.md` or `decisions.md`. Write proposals to the project's `pending/`; the user reviews and promotes them.
+- Do not edit `architecture.md`, `state.md` or `decisions.md`. Write proposals to the project's `memory/`; the user reviews and promotes them.
 - One idea per entry, dated, in a few lines.
 
 ## Work

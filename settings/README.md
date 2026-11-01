@@ -71,13 +71,13 @@ contains no home paths and passes the gitleaks hook.
   changes), effort level and agent if you are inside a subagent.
 - Line 2: context bar (green <70 %, amber ≥70 %, red ≥85 % with `⚠ compact`), tokens in the
   window / window size, session cost and duration, 5h/7d limits (if your plan sends them) and the
-  project's memory status: name, pending `.md` files in `pending/` and days since `state.md` was
+  project's memory status: name, pending `.md` files in `memory/` and days since `state.md` was
   last touched once past 14. With no associated project it shows `no memory`.
 - Fields missing from the JSON are omitted. With the status line active, Claude Code stops showing
   almost all footer hints (`esc to interrupt`, `? for shortcuts`).
 
 The project is resolved from `autoMemoryDirectory` in `<repo>/.claude/settings.local.json` (written
-by `new-project.sh`) or, failing that, from `<data>/project-memories/<repo-name>`.
+by `new-project.sh`) or, failing that, from `<data>/projects/<repo-name>`.
 
 The same script serves Antigravity CLI and GitHub Copilot CLI, whose `statusLine` setting has the
 same shape (`type`, `command`, `padding`, `refreshInterval`) and also sends JSON on stdin. Copilot

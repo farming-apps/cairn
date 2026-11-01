@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Promotes what the model left in project-memories/<p>/pending/ into state.md or decisions.md.
-# It is the only checkpoint for that folder: pending/ is ignored by git and the hook
+# Promotes what the model left in projects/<p>/memory/ into state.md or decisions.md.
+# It is the only checkpoint for that folder: memory/ is ignored by git and the hook
 # never sees it. Runs sanitize.py and checks that the destination stays within its limit.
 #
 # Usage: promote.sh <project> [state|decisions] [--clear] [--yes]
-#   --clear  delete the .md files in pending/ after promoting them
+#   --clear  delete the .md files in memory/ after promoting them
 #   --yes    do not ask for confirmation
 set -euo pipefail
 
@@ -22,8 +22,8 @@ for a in "$@"; do
 done
 
 pdir="$PM_DIR/$project"
-pending="$pdir/pending"
-dest_rel="project-memories/$project/$dest_kind.md"
+pending="$pdir/memory"
+dest_rel="projects/$project/$dest_kind.md"
 dest="$DATA/$dest_rel"
 [ -d "$pdir" ] || { echo "promote: $pdir does not exist" >&2; exit 1; }
 [ -f "$dest" ] || { echo "promote: $dest_rel does not exist" >&2; exit 1; }
@@ -31,7 +31,7 @@ dest="$DATA/$dest_rel"
 files=()
 while IFS= read -r -d '' f; do files+=("$f"); done \
   < <(find "$pending" -maxdepth 2 -type f -name '*.md' -print0 2>/dev/null | sort -z)
-[ ${#files[@]} -gt 0 ] || { echo "promote: pending/ is empty"; exit 0; }
+[ ${#files[@]} -gt 0 ] || { echo "promote: memory/ is empty"; exit 0; }
 
 echo "== 1/3 sanitize"
 python3 "$ROOT/tools/sanitize.py" "${files[@]}"
@@ -69,7 +69,7 @@ echo "promote: appended. Edit $dest_rel if needed and commit."
 
 if [ "$clear" -eq 1 ]; then
   rm -f "${files[@]}"
-  echo "promote: pending/ cleared"
+  echo "promote: memory/ cleared"
 else
-  echo "promote: pending/ kept (use --clear to delete it)"
+  echo "promote: memory/ kept (use --clear to delete it)"
 fi

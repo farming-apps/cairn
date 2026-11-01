@@ -52,7 +52,7 @@ def detect_project():
 
 
 def system_prompt(project):
-    if not project or not os.path.isdir(os.path.join(DATA, "project-memories", project)):
+    if not project or not os.path.isdir(os.path.join(DATA, "projects", project)):
         with open(os.path.join(DATA, "global", "AGENTS.md"), encoding="utf-8") as fh:
             return fh.read()
     bundle = os.path.join(DATA, "build", project, "AGENTS.md")

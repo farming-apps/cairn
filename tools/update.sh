@@ -2,6 +2,8 @@
 # Updates this tool to the latest release (git tag vX.Y.Z) and re-runs install.sh so client hooks,
 # settings and skills match the new version. The memory repository is never committed to: pending
 # layout migrations (migrations/NNN-*.sh) only run after asking, and their changes stay unstaged.
+# What moves is the installed copy (install.sh's worktree, $AI_MEMORY_INSTALL_DIR or
+# ~/.local/share/ai-memory) when there is one; otherwise the clone it is run from.
 #
 # Usage: update.sh [--check] [--to vX.Y.Z] [--channel release|main] [--yes] [--dry-run]
 #   --check            only report whether an update exists (used by doctor.sh); never changes anything
@@ -13,6 +15,7 @@ set -euo pipefail
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 CHECK=0; YES=0; DRY=0; TO=""; CHANNEL=release; POST=0
+ORIG_ARGS=("$@")
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -48,15 +51,7 @@ if [ "$POST" -eq 1 ]; then
       say "update: memory repo layout $layout is newer than this version supports ($DATA_LAYOUT_SUPPORTED); install a newer release" >&2
       exit 1
     fi
-    for m in "$ROOT"/migrations/[0-9][0-9][0-9]-*.sh; do
-      [ -f "$m" ] || continue
-      n="$(basename "$m" | cut -c1-3)"; n=$((10#$n))
-      [ "$n" -gt "$layout" ] && [ "$n" -le "$DATA_LAYOUT_SUPPORTED" ] || continue
-      say "migration $(basename "$m") on $DATA (changes stay unstaged; review with git status and commit)"
-      if [ "$DRY" -eq 1 ]; then say "  + bash $m $DATA"; continue; fi
-      confirm "  run it?" || { say "update: migration declined; the memory repo stays at layout $layout" >&2; exit 1; }
-      bash "$m" "$DATA"
-    done
+    run_migrations "$DRY" "$YES" || exit 1
   fi
   install_args=()
   [ "$YES" -eq 1 ] && install_args+=(--yes)
@@ -65,6 +60,13 @@ if [ "$POST" -eq 1 ]; then
 fi
 
 # --- phase 1: pick the target and check it out -----------------------------------------------------
+# With an installed copy (install.sh's detached worktree), that copy is what gets updated, never the
+# clone this was run from: hand over to the installed update.sh with the same arguments.
+install_real=""; [ -d "$INSTALL_DIR" ] && install_real="$(cd "$INSTALL_DIR" && pwd -P)"
+if [ -n "$install_real" ] && [ "$ROOT" != "$install_real" ] && [ -f "$install_real/tools/update.sh" ]; then
+  exec bash "$install_real/tools/update.sh" ${ORIG_ARGS[@]+"${ORIG_ARGS[@]}"}
+fi
+
 g rev-parse --git-dir >/dev/null 2>&1 || { say "update: $ROOT is not a git clone; reinstall with git clone" >&2; exit 1; }
 
 if ! g fetch --tags --quiet origin 2>/dev/null; then
@@ -117,7 +119,9 @@ if [ "$DRY" -eq 1 ]; then
 fi
 confirm "update now?" || { say "cancelled"; exit 0; }
 
-if [ "$CHANNEL" = main ] && [ -z "$TO" ]; then
+if [ "$ROOT" = "$install_real" ]; then
+  g checkout -q --detach "$target"   # the installed worktree: main is checked out in the clone already
+elif [ "$CHANNEL" = main ] && [ -z "$TO" ]; then
   g checkout -q main 2>/dev/null || g checkout -q -b main origin/main
   g merge -q --ff-only origin/main
 else
