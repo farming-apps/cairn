@@ -125,6 +125,7 @@ POLICY_RX = re.compile(
     r"|~/\.copilot/(hooks(/.*)?|permissions-config\.json|settings\.json|mcp-config\.json)"
     r"|~/Library/Application Support/Code/User/mcp\.json|~/\.config/Code/User/mcp\.json"   # MCP servers run commands
     r"|~/\.config/(ai-memory|git-projects)(/.*)?"   # ai-memory machine config (env, registry, forbidden terms): edited by hand only
+    r"|(.*/)?(policy|settings)/(claude|agy|copilot|vscode)(/.*)?"   # ai-memory policy floor and the user's client preferences
     r"|(.*/)?guard-bash\.py)$", re.I)
 AGENT_RX = re.compile(
     r"^(~/\.(claude|gemini|copilot|codex)(/.*)?|(.*/)?\.(claude|cursor|vscode|gemini|agents|codex|windsurf|continue"
@@ -543,7 +544,7 @@ def inspect_paths(name, toks, cwd, depth):
         elif cat in ("envfile", "keyfile"):
             found.append(("deny" if name in READERS and not w else "ask", f"{t}: secrets file"))
         elif cat == "policy" and (w or depth):
-            found.append(("deny", f"{t}: the agent's own policy; edit the template and re-run install.sh"))
+            found.append(("deny", f"{t}: the agent's own policy; edit it by hand and re-run install.sh"))
         elif cat == "agent" and (w or depth):
             found.append(("ask", f"{t}: agent or editor configuration"))
         elif cat == "startup" and (w or depth):

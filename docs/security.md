@@ -28,8 +28,9 @@ Golden rule: **the repo names variables, never their values.** `ANTHROPIC_API_KE
 5. **Private repo + 2FA + SSH**, encrypted disk (FileVault or equivalent).
 
 ## What the model may do on the machine
-Independent of memory: `settings/claude/` and `settings/agy/` set Claude Code and Antigravity CLI
-permissions that travel with the repo (see `settings/README.md`). Three layers: `deny`/`ask`
+Independent of memory: `policy/` (tool repo) sets the security floor for Claude Code, Antigravity CLI,
+Copilot CLI and VS Code; `<data>/settings/` (memory repo) adds your preferences and can only add rules,
+never remove them (see `policy/README.md`). Three layers: `deny`/`ask`
 rules by prefix, the `tools/guard-bash.py` hook that analyses each command before it runs (the
 same script for all clients). The hook goes beyond deletion: it also catches filter-evasion tricks,
 reverse shells and exfiltration, writes to the agent's own config or to startup/persistence files

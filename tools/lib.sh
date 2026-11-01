@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Shared path resolution for every script in tools/. Source it; do not execute it.
 #
-#   ROOT        this repository (the tool): tools/, settings/, templates/, .githooks/
+#   ROOT        this repository (the tool): tools/, policy/, templates/, .githooks/
 #   LOCAL_DIR   per-machine config, never versioned ($AI_MEMORY_LOCAL or ~/.config/ai-memory)
-#   DATA        the memory repository: global/, projects/, skills/, prompts/, presets/, build/
+#   DATA        the memory repository: global/, projects/, skills/, prompts/, presets/, settings/, build/
 #               resolved from, in order: $AI_MEMORY_PROJECTS_DATA, the AI_MEMORY_PROJECTS_DATA line in $LOCAL_DIR/env,
 #               and finally $ROOT itself (single-repo layout, as before the split)
 #   PM_DIR      $DATA/projects        BUILD_DIR  $DATA/build (git-ignored bundles)
@@ -38,6 +38,12 @@ set_data() { # path  — (re)points DATA and the paths derived from it; install.
   export AI_MEMORY_PROJECTS_DATA="$DATA"   # child scripts (projects.sh -> new-project.sh -> build.sh) see the same memory repo
 }
 set_data "${AI_MEMORY_PROJECTS_DATA:-$ROOT}"
+
+# A file of the memory repo, or its default in templates/data/ when the memory repo lacks it
+# (dry-run before the repo exists, or the single-repo layout).
+data_file() { # rel-path
+  if [ -f "$DATA/$1" ]; then printf '%s' "$DATA/$1"; else printf '%s' "$ROOT/templates/data/$1"; fi
+}
 
 # 0 when memory lives in its own repository, 1 in the single-repo layout.
 data_is_separate() { [ "$DATA" != "$ROOT" ]; }

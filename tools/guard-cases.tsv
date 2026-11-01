@@ -115,3 +115,9 @@ deny	cp x.json ~/.gemini/config/mcp_config.json
 deny	tee ~/Library/Application\ Support/Code/User/mcp.json < x
 ask	tee .mcp.json < x
 none	cat ~/.copilot/mcp-config.json
+# --- policy floor (policy/) and client preferences (<data>/settings/): write = deny, read = none
+deny	sed -i s/deny/allow/ ~/ai-memory-data/settings/claude/settings.json
+deny	echo {} > /srv/ai-memory/policy/copilot/settings.json
+deny	cp x.json templates/data/settings/agy/settings.json
+none	cat ~/ai-memory-data/settings/claude/settings.json
+none	cat policy/vscode/settings.json
