@@ -140,7 +140,7 @@ link_global_skills() { # target-skills-dir
   [ "$count" -gt 0 ] && say "  ok   linked $count skill(s) in $dest_dir" || true
 }
 
-say "ai-memory at: $ROOT (modules: $MODULES)"
+say "ai-memory $(ai_memory_version) at: $ROOT (modules: $MODULES)"
 if data_is_separate; then say "memory at:    $DATA"; else say "memory at:    $ROOT (single-repo layout; use --data <path> to keep it in its own repository)"; fi
 [ "$DRY" -eq 1 ] && say "(dry-run: nothing is modified)"
 
@@ -165,6 +165,7 @@ if data_is_separate; then
       mkdir -p "$DATA"
       git -C "$DATA" init -q -b main 2>/dev/null || git -C "$DATA" init -q   # -b needs git 2.28+
       cp -R "$ROOT/templates/data/." "$DATA/"
+      printf '%s\n' "$DATA_LAYOUT_SUPPORTED" >"$DATA/.ai-memory-layout"
       git -C "$DATA" add -A
       git -C "$DATA" -c core.hooksPath=/dev/null commit -q -m "Initial memory layout" || say "  warning: initial commit failed (git identity?); commit by hand"
       say "  ok   created; add a private remote and push when ready"
@@ -172,9 +173,32 @@ if data_is_separate; then
   else
     say "memory repository: $DATA"
     git -C "$DATA" rev-parse --git-dir >/dev/null 2>&1 || say "  warning: $DATA is not a git repository; run 'git init' there so the hook can protect it"
+    layout="$(data_layout)"
+    if [ "$layout" -gt "$DATA_LAYOUT_SUPPORTED" ]; then
+      say "install: memory repo layout $layout is newer than this tool supports ($DATA_LAYOUT_SUPPORTED); run tools/update.sh" >&2
+      exit 1
+    fi
+    # Skeleton files added by newer releases are offered, never copied silently, and never committed.
+    missing_tpl=()
     while IFS= read -r rel; do
-      copy_if_absent "$ROOT/templates/data/$rel" "$DATA/$rel"
+      [ -e "$DATA/$rel" ] || missing_tpl+=("$rel")
     done < <(cd "$ROOT/templates/data" && find . -type f ! -name README.md | sed 's|^\./||' | sort)
+    if [ "${#missing_tpl[@]}" -eq 0 ]; then
+      say "  ok   skeleton complete"
+    else
+      say "  the skeleton in this release has ${#missing_tpl[@]} file(s) your memory repo lacks:"
+      for rel in "${missing_tpl[@]}"; do say "    $rel"; done
+      add_tpl=0
+      if [ "$DRY" -eq 1 ] || [ "$YES" -eq 1 ]; then add_tpl=1
+      elif [ -t 0 ]; then printf '  copy them (left unstaged for you to review and commit)? [y/N] '; read -r reply
+        case "$reply" in y|Y|yes|YES) add_tpl=1 ;; esac
+      fi
+      if [ "$add_tpl" -eq 1 ]; then
+        for rel in "${missing_tpl[@]}"; do copy_if_absent "$ROOT/templates/data/$rel" "$DATA/$rel"; done
+      else
+        say "  skipped (re-run install.sh to be asked again)"
+      fi
+    fi
   fi
 elif [ ! -f "$ROOT/global/AGENTS.md" ] && { has_module memory || has_module projects; }; then
   say "install: no memory here: this clone holds only the tool. Run: tools/install.sh --data <path-to-memory-repo>" >&2

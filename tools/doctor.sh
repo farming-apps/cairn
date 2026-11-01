@@ -49,8 +49,22 @@ if command -v claude >/dev/null 2>&1 || [ -f "$HOME/.claude/settings.json" ] || 
 if command -v agy >/dev/null 2>&1 || command -v gemini >/dev/null 2>&1 || [ -f "$HOME/.gemini/antigravity-cli/settings.json" ] || [ -f "$HOME/.gemini/GEMINI.md" ]; then has_agy=1; fi
 if command -v copilot >/dev/null 2>&1 || [ -f "$COPILOT_DIR/settings.json" ] || [ -f "$COPILOT_DIR/copilot-instructions.md" ]; then has_copilot=1; fi
 
-echo "ai-memory: $ROOT (modules: $MODULES)"
-if data_is_separate; then echo "memory:    $DATA"; else echo "memory:    $ROOT (single-repo layout)"; fi
+echo "ai-memory: $(ai_memory_version) at $ROOT (modules: $MODULES)"
+if data_is_separate; then echo "memory:    $DATA (layout $(data_layout))"; else echo "memory:    $ROOT (single-repo layout)"; fi
+
+echo "version"
+if [ "$(data_layout)" -gt "$DATA_LAYOUT_SUPPORTED" ]; then
+  fail "memory repo layout $(data_layout) is newer than this tool supports ($DATA_LAYOUT_SUPPORTED): run tools/update.sh"
+else
+  ok "memory repo layout $(data_layout) supported"
+fi
+if [ "${AI_MEMORY_NO_UPDATE_CHECK:-0}" != 1 ]; then   # set it to 1 to skip the network call
+  upd="$("$ROOT/tools/update.sh" --check 2>&1 | tail -1)" || true
+  case "$upd" in
+    "update available"*) warn "$upd" ;;
+    *) ok "${upd:-update check skipped}" ;;
+  esac
+fi
 
 echo "base tools"
 for t in git python3; do command -v "$t" >/dev/null 2>&1 && ok "$t" || fail "missing $t"; done
