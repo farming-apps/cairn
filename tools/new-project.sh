@@ -95,6 +95,9 @@ fi
 excluded+=("CLAUDE.local.md")
 
 say "3. Auto-memory & statusLine link -> projects/$name/memory"
+# Existing memory repos may still have the old ignore rules from before this layout change.
+ensure_line "$DATA/.gitignore" "projects/*/memory/*"
+ensure_line "$DATA/.gitignore" "!projects/*/memory/.gitkeep"
 settings="$repo/.claude/settings.local.json"
 if [ "$DRY" -eq 1 ]; then
   say "  + autoMemoryDirectory in $settings"

@@ -52,4 +52,7 @@ if [ -d "$DATA/project-memories" ] && [ ! -d "$PM_DIR" ] && [ -z "${_AI_MEMORY_O
   export _AI_MEMORY_OLD_LAYOUT_WARNED=1
   echo "ai-memory: $DATA uses the old layout (project-memories/<p>/pending/); migrate it to projects/<p>/memory/:" >&2
   echo "  git -C '$DATA' mv project-memories projects, then rename every projects/<p>/pending to memory" >&2
+  echo "  before switching Claude auto-memory, add these lines to '$DATA/.gitignore':" >&2
+  echo "    projects/*/memory/*" >&2
+  echo "    !projects/*/memory/.gitkeep" >&2
 fi
