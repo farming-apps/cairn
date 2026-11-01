@@ -4,7 +4,7 @@
 # approximate: the goal is to keep memory from growing without bound, not an exact count.
 #
 # Usage:
-#   check-size.sh                      every versioned .md in global/ and project-memories/ of the memory repo
+#   check-size.sh                      every versioned .md in global/ and projects/ of the memory repo
 #   check-size.sh --staged             staged files only (index of the repo in the current directory, for the hook)
 #   check-size.sh PATH...              specific files
 #   check-size.sh --as REL FILE        measures FILE with the limit that applies to REL
@@ -18,10 +18,10 @@ limit_for() { # token budget per memory file; 0 = no limit (tool docs, templates
   case "$1" in
     global/AGENTS.md)               echo 400 ;;
     global/*.md)                    echo 3000 ;;
-    project-memories/*/state.md)    echo 1500 ;;
-    project-memories/*/AGENTS.md)   echo 800 ;;
-    project-memories/*/skills/*)    echo 0 ;;
-    project-memories/*/*.md)        echo 3000 ;;
+    projects/*/state.md)    echo 1500 ;;
+    projects/*/AGENTS.md)   echo 800 ;;
+    projects/*/skills/*)    echo 0 ;;
+    projects/*/*.md)        echo 3000 ;;
     *)                              echo 0 ;;
   esac
 }
@@ -59,7 +59,7 @@ elif [ $# -gt 0 ]; then
 else
   while IFS= read -r -d '' rel; do
     report "$rel" "$(wc -c <"$DATA/$rel" | tr -d ' ')"
-  done < <(git -C "$DATA" ls-files -z -- 'global/*.md' 'project-memories/*/*.md')
+  done < <(git -C "$DATA" ls-files -z -- 'global/*.md' 'projects/*/*.md')
 fi
 
 exit $status

@@ -6,7 +6,7 @@ GitHub Copilot CLI and installs the pre-commit barrier (gitleaks + sanitize + si
 
 ```
 global/            rules for every session (AGENTS.md ≤ 400 tokens) + private profile (not versioned)
-project-memories/  one folder per work repo: AGENTS.md · state.md · architecture.md · decisions.md · pending/
+projects/  one folder per work repo: AGENTS.md · state.md · architecture.md · decisions.md · memory/
 skills/            shared skills (<skill>/SKILL.md) linked into every client
 prompts/           reusable prompts
 presets/           which model for which task, no keys
@@ -16,4 +16,4 @@ settings/          client preferences (defaultMode, statusLine, attribution, ext
 gateway/           LiteLLM config for phase 2 (os.environ/... only)
 build/             generated bundles (ignored)
 ```
-The repo names variables, never their values. Nothing written by a model lands outside `pending/`.
+The repo names variables, never their values. Nothing written by a model lands outside `memory/`.

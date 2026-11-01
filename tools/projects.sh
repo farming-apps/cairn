@@ -135,7 +135,7 @@ case "$cmd" in
       elif [ ! -d "$pdir" ]; then
         mem_st="none"
       else
-        pend="$(find "$pdir/pending" -type f ! -name '.gitkeep' 2>/dev/null | wc -l | tr -d ' ')"
+        pend="$(find "$pdir/memory" -type f ! -name '.gitkeep' 2>/dev/null | wc -l | tr -d ' ')"
         [ "$pend" -gt 0 ] && mem_st="pend:$pend" || mem_st="ok"
       fi
       tail_info="${p:-}"

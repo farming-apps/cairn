@@ -42,10 +42,12 @@ fails=0
 ok()   { printf '  OK   %s\n' "$*"; }
 fail() { printf '  FAIL %s\n' "$*"; fails=$((fails+1)); }
 warn() { printf '  WARN %s\n' "$*"; }
-check_floor() { # client floor target — every rule of policy/<client> must be in the installed file
-  local out
-  if out="$(python3 -I "$ROOT/tools/merge-settings.py" --check --data "$DATA" "$2" "$3" "$ROOT" 2>&1)"; then
-    ok "$1: policy floor complete ($(basename "$(dirname "$2")")/$(basename "$2"))"
+check_floor() { # client rel-floor target — every rule of policy/<rel> must be in the installed file
+  # The installed copy (HOOK_ROOT) is what install.sh applied; fall back to this clone if it has no policy/ yet.
+  local out floor="$HOOK_ROOT/policy/$2"
+  [ -f "$floor" ] || floor="$ROOT/policy/$2"
+  if out="$(python3 -I "$ROOT/tools/merge-settings.py" --check --data "$DATA" "$floor" "$3" "$HOOK_ROOT" 2>&1)"; then
+    ok "$1: policy floor complete (policy/$2)"
   else
     fail "$1: policy floor incomplete; re-run tools/install.sh"$'\n'"$out"
   fi
@@ -57,8 +59,26 @@ if command -v claude >/dev/null 2>&1 || [ -f "$HOME/.claude/settings.json" ] || 
 if command -v agy >/dev/null 2>&1 || command -v gemini >/dev/null 2>&1 || [ -f "$HOME/.gemini/antigravity-cli/settings.json" ] || [ -f "$HOME/.gemini/GEMINI.md" ]; then has_agy=1; fi
 if command -v copilot >/dev/null 2>&1 || [ -f "$COPILOT_DIR/settings.json" ] || [ -f "$COPILOT_DIR/copilot-instructions.md" ]; then has_copilot=1; fi
 
-echo "ai-memory: $ROOT (modules: $MODULES)"
-if data_is_separate; then echo "memory:    $DATA"; else echo "memory:    $ROOT (single-repo layout)"; fi
+HOOK_ROOT="$(hook_root)"   # what client hooks and the memory repo's core.hooksPath must point to
+echo "ai-memory: $(ai_memory_version) at $ROOT (modules: $MODULES)"
+if data_is_separate; then echo "memory:    $DATA (layout $(data_layout))"; else echo "memory:    $ROOT (single-repo layout)"; fi
+if [ "$HOOK_ROOT" != "$ROOT" ]; then echo "installed: $HOOK_ROOT"; fi
+
+echo "version"
+if [ "$(data_layout)" -gt "$DATA_LAYOUT_SUPPORTED" ]; then
+  fail "memory repo layout $(data_layout) is newer than this tool supports ($DATA_LAYOUT_SUPPORTED): run tools/update.sh"
+elif data_is_separate && [ "$(data_layout)" -lt "$DATA_LAYOUT_SUPPORTED" ]; then
+  fail "memory repo layout $(data_layout) is older than this tool's ($DATA_LAYOUT_SUPPORTED): run tools/install.sh to migrate it"
+else
+  ok "memory repo layout $(data_layout) supported"
+fi
+if [ "${AI_MEMORY_NO_UPDATE_CHECK:-0}" != 1 ]; then   # set it to 1 to skip the network call
+  upd="$("$ROOT/tools/update.sh" --check 2>&1 | tail -1)" || true
+  case "$upd" in
+    "update available"*) warn "$upd" ;;
+    *) ok "${upd:-update check skipped}" ;;
+  esac
+fi
 
 echo "base tools"
 for t in git python3; do command -v "$t" >/dev/null 2>&1 && ok "$t" || fail "missing $t"; done
@@ -83,10 +103,20 @@ if has_module hardening; then
   else
     fail "$ROOT is not a git repository"
   fi
+  if [ -f "$INSTALL_DIR/tools/guard-bash.py" ]; then
+    inst_at="$(git -C "$INSTALL_DIR" describe --tags --exact-match HEAD 2>/dev/null || git -C "$INSTALL_DIR" rev-parse --short HEAD 2>/dev/null)"
+    if [ -n "$(git -C "$INSTALL_DIR" status --porcelain 2>/dev/null)" ]; then
+      fail "installed copy $INSTALL_DIR has local changes (it is generated: discard them and re-run tools/install.sh)"
+    else
+      ok "installed copy at $inst_at (detached worktree; tools/update.sh moves it)"
+    fi
+  else
+    warn "no installed copy in $INSTALL_DIR: hooks run from this clone, so switching branches changes them (tools/install.sh without --dev)"
+  fi
   if data_is_separate; then
     if git -C "$DATA" rev-parse --git-dir >/dev/null 2>&1; then
       hp="$(git -C "$DATA" config --get core.hooksPath || true)"
-      [ "$hp" = "$ROOT/.githooks" ] && ok "memory repo core.hooksPath -> tool .githooks" || fail "memory repo core.hooksPath = '${hp:-<empty>}' (run tools/install.sh)"
+      [ "$hp" = "$HOOK_ROOT/.githooks" ] && ok "memory repo core.hooksPath -> tool .githooks" || fail "memory repo core.hooksPath = '${hp:-<empty>}' (run tools/install.sh)"
     else
       fail "memory repo $DATA is not a git repository (tools/install.sh --data $DATA)"
     fi
@@ -103,7 +133,7 @@ if has_module hardening; then
   settings="$HOME/.claude/settings.json"
   if [ "$has_claude" -eq 1 ]; then
     if [ -f "$settings" ]; then
-      if python3 - "$settings" "$ROOT" <<'PY'
+      if python3 - "$settings" "$HOOK_ROOT" <<'PY'
 import json, sys
 path, root = sys.argv[1:3]
 try:
@@ -128,7 +158,7 @@ if ok:
 sys.exit(0 if ok else 1)
 PY
       then :; else fails=$((fails+1)); fi
-      check_floor claude "$ROOT/policy/claude/settings.json" "$settings"
+      check_floor claude claude/settings.json "$settings"
     else
       fail "claude: $settings does not exist (tools/install.sh)"
     fi
@@ -139,7 +169,7 @@ PY
   echo "Antigravity CLI / Gemini (hardening)"
   agy_settings="$HOME/.gemini/antigravity-cli/settings.json"; agy_hooks="$HOME/.gemini/config/hooks.json"
   if [ "$has_agy" -eq 1 ]; then
-    if python3 - "$agy_settings" "$agy_hooks" "$ROOT" <<'PY'
+    if python3 - "$agy_settings" "$agy_hooks" "$HOOK_ROOT" <<'PY'
 import json, sys
 settings, hooks_path, root = sys.argv[1:4]
 ok = True
@@ -174,7 +204,7 @@ except Exception as e:
 sys.exit(0 if ok else 1)
 PY
     then :; else fails=$((fails+1)); fi
-    [ -f "$agy_settings" ] && check_floor agy "$ROOT/policy/agy/settings.json" "$agy_settings"
+    [ -f "$agy_settings" ] && check_floor agy agy/settings.json "$agy_settings"
     if echo '{"toolCall":{"name":"run_command","args":{"CommandLine":"rm -rf ~/x"}},"workspacePaths":["/tmp"]}' \
          | python3 -I "$ROOT/tools/guard-bash.py" | grep -q '"deny"'; then
       ok "guard-bash responds in agy format"
@@ -190,7 +220,7 @@ PY
   if [ "$has_copilot" -eq 1 ]; then
     if [ ! -f "$copilot_settings" ]; then
       fail "copilot: $copilot_settings does not exist (tools/install.sh)"
-    elif python3 - "$copilot_settings" "$ROOT" <<'PY'
+    elif python3 - "$copilot_settings" "$HOOK_ROOT" <<'PY'
 import json, sys
 path, root = sys.argv[1:3]
 try:
@@ -218,7 +248,7 @@ else:
 sys.exit(0 if ok else 1)
 PY
     then :; else fails=$((fails+1)); fi
-    [ -f "$copilot_settings" ] && check_floor copilot "$ROOT/policy/copilot/settings.json" "$copilot_settings"
+    [ -f "$copilot_settings" ] && check_floor copilot copilot/settings.json "$copilot_settings"
     if echo '{"tool_name":"Bash","tool_input":{"command":"rm -rf ~/x"},"cwd":"/tmp"}' \
         | python3 -I "$ROOT/tools/guard-bash.py" --out copilot 2>/dev/null | grep -q '^{"permissionDecision": "deny"'; then
       ok "guard-bash responds in copilot format"
@@ -250,7 +280,7 @@ off = sum(1 for v in have.values() if v is False)
 print(f"  OK   vscode: built-in Copilot off in {off} file type(s), on elsewhere")
 PY
     then :; else fails=$((fails+1)); fi
-    [ -f "$vscode_settings" ] && check_floor vscode "$ROOT/policy/vscode/settings.json" "$vscode_settings"
+    [ -f "$vscode_settings" ] && check_floor vscode vscode/settings.json "$vscode_settings"
   else
     warn "VS Code not installed (skipped)"
   fi
@@ -281,7 +311,7 @@ if has_module memory; then
   if [ ! -d "$DATA" ]; then
     fail "memory repo $DATA does not exist (tools/install.sh --data $DATA creates it)"
   elif git -C "$DATA" rev-parse --git-dir >/dev/null 2>&1; then
-    git -C "$DATA" check-ignore -q project-memories/x/pending/x.md && ok "pending/ ignored" || fail "project-memories/*/pending/ is not ignored in $DATA"
+    git -C "$DATA" check-ignore -q projects/x/memory/x.md && ok "memory/ ignored" || fail "projects/*/memory/ is not ignored in $DATA"
     git -C "$DATA" check-ignore -q global/profile.private.md && ok "profile.private.md ignored" || fail "global/profile.private.md is not ignored in $DATA"
     remote="$(git -C "$DATA" remote get-url origin 2>/dev/null || true)"
     [ -n "$remote" ] && ok "memory remote: ${remote%%:*}…" || warn "memory repo has no remote configured (backup pending)"

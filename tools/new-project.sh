@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Creates <data>/project-memories/<name>/ from the template and, if given, connects a work repo
+# Creates <data>/projects/<name>/ from the template and, if given, connects a work repo
 # for Claude Code, Antigravity CLI (agy) and GitHub Copilot CLI without dirtying
 # its git status: all personal bridges and skills go to .git/info/exclude.
 # Re-running it on a repo repairs the bridges: lines pointing at a previous memory path are dropped.
@@ -13,10 +13,10 @@
 #
 # In the work repo it writes (all excluded in .git/info/exclude):
 #   CLAUDE.local.md                              Claude Code imports of AGENTS.md and state.md
-#   .claude/settings.local.json                  autoMemoryDirectory -> project-memories/<name>/pending
+#   .claude/settings.local.json                  autoMemoryDirectory -> projects/<name>/memory
 #   GEMINI.md (or .agents/rules/ai-memory.md)    Antigravity CLI @[label](path) includes
 #   .github/instructions/ai-memory.instructions.md  GitHub Copilot CLI symlink -> build/<name>/copilot.instructions.md
-#   .claude/skills/<s*> & .agents/skills/<s*>    shared skills from skills/ and project-memories/<name>/skills/
+#   .claude/skills/<s*> & .agents/skills/<s*>    shared skills from skills/ and projects/<name>/skills/
 set -euo pipefail
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -38,14 +38,15 @@ say() { printf '%s\n' "$*"; }
 run() { if [ "$DRY" -eq 1 ]; then say "  + $*"; else "$@"; fi; }
 
 pdir="$PM_DIR/$name"
-template="$ROOT/templates/data/project-memories/_template"
-say "1. project memory: $DATA_TILDE/project-memories/$name"
+template="$ROOT/templates/data/projects/_template"
+say "1. project memory: $DATA_TILDE/projects/$name"
 if [ -d "$pdir" ]; then
   say "  ok   already exists, left untouched"
+  [ -d "$pdir/memory" ] || { say "  create $name/memory/ (auto-memory)"; run mkdir -p "$pdir/memory"; run touch "$pdir/memory/.gitkeep"; }
 else
-  say "  create from templates/data/project-memories/_template"
+  say "  create from templates/data/projects/_template"
   if [ "$DRY" -eq 0 ]; then
-    mkdir -p "$pdir/pending"; touch "$pdir/pending/.gitkeep"
+    mkdir -p "$pdir/memory"; touch "$pdir/memory/.gitkeep"
     for f in AGENTS.md architecture.md state.md decisions.md; do
       sed "s/<proyecto>/$name/g; s/<AAAA-MM-DD>/$(date +%F)/g" "$template/$f" >"$pdir/$f"
     done
@@ -101,13 +102,16 @@ if [ -f "$repo/AGENTS.md" ] && [ ! -f "$repo/CLAUDE.md" ] && [ ! -f "$repo/.clau
 fi
 excluded+=("CLAUDE.local.md")
 
-say "3. Auto-memory & statusLine link -> project-memories/$name/pending"
+say "3. Auto-memory & statusLine link -> projects/$name/memory"
+# Existing memory repos may still have the old ignore rules from before this layout change.
+ensure_line "$DATA/.gitignore" "projects/*/memory/*"
+ensure_line "$DATA/.gitignore" "!projects/*/memory/.gitkeep"
 settings="$repo/.claude/settings.local.json"
 if [ "$DRY" -eq 1 ]; then
   say "  + autoMemoryDirectory in $settings"
 else
   mkdir -p "$repo/.claude"
-  python3 - "$settings" "$pdir/pending" <<'PY'
+  python3 - "$settings" "$pdir/memory" <<'PY'
 import json, os, sys
 path, target = sys.argv[1:3]
 data = {}
@@ -139,16 +143,16 @@ if [ "$use_agy_rule" -eq 1 ]; then
       printf -- '---\ntrigger: always_on\ndescription: project memory (ai-memory)\n---\n' >"$rule"
     fi
   fi
-  agy_agents="@[ai-memory]($DATA_TILDE/project-memories/$name/AGENTS.md)"
-  agy_state="@[state]($DATA_TILDE/project-memories/$name/state.md)"
+  agy_agents="@[ai-memory]($DATA_TILDE/projects/$name/AGENTS.md)"
+  agy_state="@[state]($DATA_TILDE/projects/$name/state.md)"
   drop_stale_lines "$rule" "$agy_agents" "$agy_state"
   ensure_line "$rule" "$agy_agents"
   ensure_line "$rule" "$agy_state"
   excluded+=(".agents/rules/ai-memory.md")
 else
   [ -f "$repo/GEMINI.md" ] && say "  ok   GEMINI.md" || say "  create GEMINI.md"
-  agy_agents="@[ai-memory]($DATA_TILDE/project-memories/$name/AGENTS.md)"
-  agy_state="@[state]($DATA_TILDE/project-memories/$name/state.md)"
+  agy_agents="@[ai-memory]($DATA_TILDE/projects/$name/AGENTS.md)"
+  agy_state="@[state]($DATA_TILDE/projects/$name/state.md)"
   drop_stale_lines "$repo/GEMINI.md" "$agy_agents" "$agy_state"
   ensure_line "$repo/GEMINI.md" "$agy_agents"
   ensure_line "$repo/GEMINI.md" "$agy_state"
@@ -183,7 +187,7 @@ for sdir in "$DATA/skills"/* "$pdir/skills"/*; do
   done
   skill_count=$((skill_count + 1))
 done
-[ "$skill_count" -gt 0 ] && say "  linked $skill_count skill(s) into .claude/skills and .agents/skills" || say "  no custom skills in skills/ or project-memories/$name/skills/ (skipped)"
+[ "$skill_count" -gt 0 ] && say "  linked $skill_count skill(s) into .claude/skills and .agents/skills" || say "  no custom skills in skills/ or projects/$name/skills/ (skipped)"
 
 say "7. flat AGENTS.md for other clients"
 if [ "$AGENTS" -eq 1 ]; then

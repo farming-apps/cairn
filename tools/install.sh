@@ -4,11 +4,17 @@
 # None of the three AI clients (claude, agy, copilot) is mandatory: each one is configured
 # automatically if installed (or if its config dir exists), or when forced via flags.
 #
-# Usage: install.sh [--data <path>] [--dry-run] [--yes] [--module <m>] [--claude|--no-claude] [--gemini|--no-gemini] [--copilot|--no-copilot] [--vscode|--no-vscode]
-#   --data <path>          where the memory repository lives (global/, project-memories/, skills/...).
+# Source: the first run checks out the latest release (origin/main before the first one) in a detached
+# worktree ($AI_MEMORY_INSTALL_DIR or ~/.local/share/ai-memory) and continues from there, so client
+# hooks, the status line and the memory repo's pre-commit hook run a released version, not whatever
+# branch is checked out in this clone. Later runs reuse it; tools/update.sh moves it to another version.
+#
+# Usage: install.sh [--data <path>] [--dev] [--dry-run] [--yes] [--module <m>] [--claude|--no-claude] [--gemini|--no-gemini] [--copilot|--no-copilot] [--vscode|--no-vscode]
+#   --data <path>          where the memory repository lives (global/, projects/, skills/...).
 #                          Remembered in ~/.config/ai-memory/env; created from templates/data/ if missing.
 #                          Without it, and with no env file, memory is expected inside this repo (single-repo layout).
-#   --dry-run              show what would be done without touching anything
+#   --dev                  install from this clone as it is (current branch, uncommitted changes), no worktree
+#   --dry-run             show what would be done without touching anything
 #   --yes                  install missing tools (gitleaks, jq) with Homebrew without asking
 #   --module <m>           comma-separated modules to run: hardening, memory, mcp, projects, all (default: all)
 #   --claude|--no-claude   force or skip Claude Code (default: auto)
@@ -32,11 +38,15 @@ DRY=0; YES=0
 CLAUDE=auto; GEMINI=auto; COPILOT=auto; VSCODE=auto
 MODULES="all"
 DATA_ARG=""
+DEV=0; FROM_WORKTREE=0
+ORIG_ARGS=("$@")
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --data)       DATA_ARG="${2:-}"; shift 2 ;;
     --data=*)     DATA_ARG="${1#*=}"; shift ;;
+    --dev)        DEV=1; shift ;;
+    --from-worktree) FROM_WORKTREE=1; shift ;;   # internal: added by the re-exec into the worktree
     --dry-run)    DRY=1; shift ;;
     --yes)        YES=1; shift ;;
     -m|--module)  MODULES="${2:-}"; shift 2 ;;
@@ -68,6 +78,52 @@ for m in ${MODULES//,/ }; do
 done
 
 [ -n "$DATA_ARG" ] && set_data "$DATA_ARG"
+
+# --- source: the installed copy (detached worktree) -----------------------------------------------
+# Everything after this block runs from the worktree (ROOT = INSTALL_DIR), so the paths written into
+# the clients' settings and the memory repo's core.hooksPath point at the installed copy.
+# install.sh only creates it (at the latest release, or origin/main before the first one) and never
+# moves it: changing the installed version is tools/update.sh's job (--to, --channel main).
+if [ "$FROM_WORKTREE" -eq 0 ] && [ "$DEV" -eq 0 ]; then
+  install_real="$INSTALL_DIR"; [ -d "$INSTALL_DIR" ] && install_real="$(cd "$INSTALL_DIR" && pwd -P)"
+  if [ "$ROOT" = "$install_real" ]; then
+    printf 'source: running the installed copy (%s)\n' "$INSTALL_DIR"
+  elif ! git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+    printf 'source: %s is not a git repository; installing from it as it is (--dev)\n' "$ROOT"
+  elif ! data_is_separate; then
+    printf 'source: single-repo layout (memory inside this clone); installing from it as it is (--dev)\n'
+  elif [ -e "$INSTALL_DIR/.git" ]; then
+    if [ -n "$(git -C "$INSTALL_DIR" status --porcelain 2>/dev/null)" ]; then
+      printf 'install: %s has local changes (git -C %s status); it is a generated copy: discard them and re-run\n' "$INSTALL_DIR" "$INSTALL_DIR" >&2
+      exit 1
+    fi
+    printf 'source: installed copy %s at %s (tools/update.sh changes the version)\n' "$INSTALL_DIR" \
+      "$(git -C "$INSTALL_DIR" describe --tags --exact-match HEAD 2>/dev/null || git -C "$INSTALL_DIR" rev-parse --short HEAD)"
+  else
+    # first install: latest release tag; before the first release, the remote main (local main without a remote)
+    if git -C "$ROOT" remote get-url origin >/dev/null 2>&1; then
+      git -C "$ROOT" fetch --quiet --tags origin 2>/dev/null || printf 'source: could not fetch origin (offline?); using the last known refs\n'
+    fi
+    ref="$(git -C "$ROOT" tag -l 'v[0-9]*' --sort=-v:refname | head -1)"
+    if [ -z "$ref" ]; then
+      if git -C "$ROOT" rev-parse -q --verify refs/remotes/origin/main >/dev/null; then ref="origin/main"; else ref="main"; fi
+    fi
+    if [ "$DRY" -eq 1 ]; then
+      printf 'source: would check out %s (%s, detached) in %s; showing the rest from this clone\n' \
+        "$ref" "$(git -C "$ROOT" rev-parse --short "$ref^{commit}")" "$INSTALL_DIR"
+      FROM_WORKTREE=1
+    else
+      git -C "$ROOT" worktree prune
+      mkdir -p "$(dirname "$INSTALL_DIR")"
+      git -C "$ROOT" worktree add --quiet --detach "$INSTALL_DIR" "$ref"
+      printf 'source: %s checked out at %s (%s)\n' "$INSTALL_DIR" "$ref" "$(git -C "$INSTALL_DIR" rev-parse --short HEAD)"
+    fi
+    if [ "$FROM_WORKTREE" -eq 0 ]; then
+      exec bash "$INSTALL_DIR/tools/install.sh" --from-worktree ${ORIG_ARGS[@]+"${ORIG_ARGS[@]}"}
+    fi
+  fi
+fi
+
 COPILOT_DIR="${COPILOT_HOME:-$HOME/.copilot}"
 # VS Code user settings dir: $VSCODE_USER_DIR overrides; macOS and Linux defaults otherwise.
 case "$(uname -s)" in
@@ -140,7 +196,7 @@ link_global_skills() { # target-skills-dir
   [ "$count" -gt 0 ] && say "  ok   linked $count skill(s) in $dest_dir" || true
 }
 
-say "ai-memory at: $ROOT (modules: $MODULES)"
+say "ai-memory $(ai_memory_version) at: $ROOT (modules: $MODULES)"
 if data_is_separate; then say "memory at:    $DATA"; else say "memory at:    $ROOT (single-repo layout; use --data <path> to keep it in its own repository)"; fi
 [ "$DRY" -eq 1 ] && say "(dry-run: nothing is modified)"
 
@@ -165,6 +221,7 @@ if data_is_separate; then
       mkdir -p "$DATA"
       git -C "$DATA" init -q -b main 2>/dev/null || git -C "$DATA" init -q   # -b needs git 2.28+
       cp -R "$ROOT/templates/data/." "$DATA/"
+      printf '%s\n' "$DATA_LAYOUT_SUPPORTED" >"$DATA/.ai-memory-layout"
       git -C "$DATA" add -A
       git -C "$DATA" -c core.hooksPath=/dev/null commit -q -m "Initial memory layout" || say "  warning: initial commit failed (git identity?); commit by hand"
       say "  ok   created; add a private remote and push when ready"
@@ -172,9 +229,36 @@ if data_is_separate; then
   else
     say "memory repository: $DATA"
     git -C "$DATA" rev-parse --git-dir >/dev/null 2>&1 || say "  warning: $DATA is not a git repository; run 'git init' there so the hook can protect it"
+    layout="$(data_layout)"
+    if [ "$layout" -gt "$DATA_LAYOUT_SUPPORTED" ]; then
+      say "install: memory repo layout $layout is newer than this tool supports ($DATA_LAYOUT_SUPPORTED); run tools/update.sh" >&2
+      exit 1
+    fi
+    if [ "$layout" -lt "$DATA_LAYOUT_SUPPORTED" ]; then
+      say "  layout $layout -> $DATA_LAYOUT_SUPPORTED: the memory repo needs a migration before the skeleton check"
+      run_migrations "$DRY" "$YES" || { say "install: the memory repo must be migrated first (re-run and accept, or --yes)" >&2; exit 1; }
+    fi
+    # Skeleton files added by newer releases are offered, never copied silently, and never committed.
+    missing_tpl=()
     while IFS= read -r rel; do
-      copy_if_absent "$ROOT/templates/data/$rel" "$DATA/$rel"
+      [ -e "$DATA/$rel" ] || missing_tpl+=("$rel")
     done < <(cd "$ROOT/templates/data" && find . -type f ! -name README.md | sed 's|^\./||' | sort)
+    if [ "${#missing_tpl[@]}" -eq 0 ]; then
+      say "  ok   skeleton complete"
+    else
+      say "  the skeleton in this release has ${#missing_tpl[@]} file(s) your memory repo lacks:"
+      for rel in "${missing_tpl[@]}"; do say "    $rel"; done
+      add_tpl=0
+      if [ "$DRY" -eq 1 ] || [ "$YES" -eq 1 ]; then add_tpl=1
+      elif [ -t 0 ]; then printf '  copy them (left unstaged for you to review and commit)? [y/N] '; read -r reply
+        case "$reply" in y|Y|yes|YES) add_tpl=1 ;; esac
+      fi
+      if [ "$add_tpl" -eq 1 ]; then
+        for rel in "${missing_tpl[@]}"; do copy_if_absent "$ROOT/templates/data/$rel" "$DATA/$rel"; done
+      else
+        say "  skipped (re-run install.sh to be asked again)"
+      fi
+    fi
   fi
 elif [ ! -f "$ROOT/global/AGENTS.md" ] && { has_module memory || has_module projects; }; then
   say "install: no memory here: this clone holds only the tool. Run: tools/install.sh --data <path-to-memory-repo>" >&2
