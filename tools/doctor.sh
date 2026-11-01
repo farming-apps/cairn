@@ -50,9 +50,25 @@ if command -v agy >/dev/null 2>&1 || command -v gemini >/dev/null 2>&1 || [ -f "
 if command -v copilot >/dev/null 2>&1 || [ -f "$COPILOT_DIR/settings.json" ] || [ -f "$COPILOT_DIR/copilot-instructions.md" ]; then has_copilot=1; fi
 
 HOOK_ROOT="$(hook_root)"   # what client hooks and the memory repo's core.hooksPath must point to
-echo "ai-memory: $ROOT (modules: $MODULES)"
-if data_is_separate; then echo "memory:    $DATA"; else echo "memory:    $ROOT (single-repo layout)"; fi
+echo "ai-memory: $(ai_memory_version) at $ROOT (modules: $MODULES)"
+if data_is_separate; then echo "memory:    $DATA (layout $(data_layout))"; else echo "memory:    $ROOT (single-repo layout)"; fi
 if [ "$HOOK_ROOT" != "$ROOT" ]; then echo "installed: $HOOK_ROOT"; fi
+
+echo "version"
+if [ "$(data_layout)" -gt "$DATA_LAYOUT_SUPPORTED" ]; then
+  fail "memory repo layout $(data_layout) is newer than this tool supports ($DATA_LAYOUT_SUPPORTED): run tools/update.sh"
+elif data_is_separate && [ "$(data_layout)" -lt "$DATA_LAYOUT_SUPPORTED" ]; then
+  fail "memory repo layout $(data_layout) is older than this tool's ($DATA_LAYOUT_SUPPORTED): run tools/install.sh to migrate it"
+else
+  ok "memory repo layout $(data_layout) supported"
+fi
+if [ "${AI_MEMORY_NO_UPDATE_CHECK:-0}" != 1 ]; then   # set it to 1 to skip the network call
+  upd="$("$ROOT/tools/update.sh" --check 2>&1 | tail -1)" || true
+  case "$upd" in
+    "update available"*) warn "$upd" ;;
+    *) ok "${upd:-update check skipped}" ;;
+  esac
+fi
 
 echo "base tools"
 for t in git python3; do command -v "$t" >/dev/null 2>&1 && ok "$t" || fail "missing $t"; done
@@ -78,15 +94,11 @@ if has_module hardening; then
     fail "$ROOT is not a git repository"
   fi
   if [ -f "$INSTALL_DIR/tools/guard-bash.py" ]; then
-    inst_head="$(git -C "$INSTALL_DIR" rev-parse HEAD 2>/dev/null || true)"
-    inst_ref="origin/main"; git -C "$INSTALL_DIR" rev-parse -q --verify "refs/remotes/$inst_ref" >/dev/null || inst_ref="main"
-    inst_tip="$(git -C "$INSTALL_DIR" rev-parse -q --verify "$inst_ref" 2>/dev/null || true)"
+    inst_at="$(git -C "$INSTALL_DIR" describe --tags --exact-match HEAD 2>/dev/null || git -C "$INSTALL_DIR" rev-parse --short HEAD 2>/dev/null)"
     if [ -n "$(git -C "$INSTALL_DIR" status --porcelain 2>/dev/null)" ]; then
       fail "installed copy $INSTALL_DIR has local changes (it is generated: discard them and re-run tools/install.sh)"
-    elif [ -n "$inst_tip" ] && [ "$inst_head" != "$inst_tip" ]; then
-      warn "installed copy is at ${inst_head:0:7}, $inst_ref is at ${inst_tip:0:7} (re-run tools/install.sh to update)"
     else
-      ok "installed copy at ${inst_head:0:7} ($inst_ref, detached worktree)"
+      ok "installed copy at $inst_at (detached worktree; tools/update.sh moves it)"
     fi
   else
     warn "no installed copy in $INSTALL_DIR: hooks run from this clone, so switching branches changes them (tools/install.sh without --dev)"

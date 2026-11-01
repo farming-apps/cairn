@@ -38,22 +38,46 @@ their client's syntax: `CLAUDE.md` → `@AGENTS.md` (Claude Code); `GEMINI.md` �
 ## Install on a machine
 Requirements: `git` and `python3` (3.9+, standard library only). On macOS both come with the Xcode
 Command Line Tools (`xcode-select --install`).
+
+Client hooks store an absolute path, so they must point at a **release** in a stable place you do
+not develop in; otherwise uncommitted work in a dev clone would run live in every session.
+`install.sh` takes care of that from any clone:
 ```sh
-git clone <tool-repo> ~/ai-memory                        # any path works
-~/ai-memory/tools/install.sh --data ~/ai-memory-data     # creates the memory repo if missing, or clone yours first
-~/ai-memory/tools/doctor.sh                              # --module hardening,memory,mcp,projects (all by default)
+git clone <tool-repo> ~/dev/ai-memory                    # your clone: develop here
+~/dev/ai-memory/tools/install.sh --data ~/ai-memory-data # creates the memory repo if missing, or clone yours first
+~/dev/ai-memory/tools/doctor.sh                          # --module hardening,memory,mcp,projects (all by default)
 ```
+The first run checks out the latest release tag (`origin/main` before the first release) in a detached
+worktree at `~/.local/share/ai-memory` (`AI_MEMORY_INSTALL_DIR` overrides it) and re-runs itself from
+there. Hooks, the status line and the memory repo's pre-commit hook point at that installed copy, so
+switching branches in your clone does not change them. Later runs reuse it as it is; only `update.sh`
+moves it. A plain `git clone --branch vX.Y.Z <tool-repo> ~/.local/share/ai-memory` works too.
+`--dev` skips the installed copy and wires the clients to the clone as it is, to try a branch; the
+single-repo layout (memory inside the clone) always installs this way. `doctor.sh` fails if the
+installed copy has local changes.
+
+### Update
+```sh
+tools/update.sh            # latest release: checkout the tag, then re-run install.sh
+tools/update.sh --check    # only report (doctor.sh does this too)
+tools/update.sh --to v0.1.0  # pin or roll back
+tools/update.sh --channel main  # follow main instead of releases
+```
+Run from your clone or from the installed copy: when the installed copy exists, that is what moves.
+`update.sh` refuses to move a clone with uncommitted changes or local commits. Your memory repo is
+never committed to: skeleton files added by a new release are listed and copied only if you accept,
+and layout migrations (`migrations/NNN-*.sh`, see `migrations/README.md`) run only after asking. Both
+leave changes unstaged for you to review with `git status` and commit. The layout of the memory repo
+is the integer in `<data>/.ai-memory-layout` (missing means 1); a tool that is too old for it stops.
+
+### Releasing
+Commits to `main` follow [Conventional Commits](https://www.conventionalcommits.org): `fix:` → patch,
+`feat:` → minor, `feat!:` or `BREAKING CHANGE:` → major. The `release` workflow (release-please) keeps
+a release PR open; merging it bumps `VERSION`, updates `CHANGELOG.md` and tags `vX.Y.Z`, which is what
+`update.sh` installs.
+
 `--data` is remembered in `~/.config/ai-memory/env`; later runs do not need it. On a second machine,
 clone your private memory repo first and point `--data` at it.
-
-**Installed copy.** `install.sh` does not wire the clients to your clone. It checks out `origin/main`
-(local `main` if there is no remote) in a detached worktree at `~/.local/share/ai-memory`
-(`AI_MEMORY_INSTALL_DIR` overrides it) and re-runs itself from there. That way the guard-bash hook,
-the status line and the memory repo's pre-commit hook run what was merged, and switching branches in
-the clone does not change them. To update after a merge, run `tools/install.sh` again from the clone.
-`--dev` skips the worktree and installs from the clone as it is, to try a branch. The single-repo
-layout (memory inside the clone) always installs this way. `doctor.sh` warns when the installed copy
-is behind `origin/main`, and fails if it has local changes.
 
 None of the three supported AI clients (**Claude Code**, **Antigravity CLI `agy`**, **GitHub Copilot CLI `copilot`**) is mandatory: `install.sh` and `doctor.sh` auto-detect which ones are installed on the machine and skip the rest without failing. You can also run a single module with `--module hardening`, `--module memory`, `--module mcp`, or `--module projects`.
 `install.sh` is idempotent and prints every step. It first checks the tools: `gitleaks` (the hook
@@ -71,7 +95,7 @@ All optional. Export them in `~/.zshrc` or similar; no script loads `.env.exampl
 | Variable | Read by | Purpose | Default |
 |---|---|---|---|
 | `AI_MEMORY_PROJECTS_DATA` | every script (via `tools/lib.sh`), `tools/ai` | Path of the memory repo: `global/`, `projects/`, `skills/` | the `AI_MEMORY_PROJECTS_DATA` line in `$AI_MEMORY_LOCAL/env` (written by `install.sh --data`), else this repo |
-| `AI_MEMORY_INSTALL_DIR` | `tools/install.sh`, `tools/doctor.sh` (via `tools/lib.sh`) | Installed copy: detached worktree of `origin/main` that client hooks point to | `~/.local/share/ai-memory` |
+| `AI_MEMORY_INSTALL_DIR` | `tools/install.sh`, `tools/doctor.sh` (via `tools/lib.sh`) | Installed copy (detached worktree at a release) that client hooks point to | `~/.local/share/ai-memory` |
 | `AI_MEMORY_LOCAL` | every script | Per-machine config dir, never versioned: `forbidden-terms.txt`, `env`, `projects.yml` | `~/.config/ai-memory` |
 | `AI_MEMORY_PROJECTS` | `projects.sh`, `doctor.sh` | Path of the projects registry | `$AI_MEMORY_LOCAL/projects.yml` |
 | `AI_MEMORY_PROJECTS_ENC` | `projects.sh encrypt/decrypt` | Default path of the encrypted registry backup | none (pass it as an argument) |
