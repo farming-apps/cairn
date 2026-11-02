@@ -67,7 +67,7 @@ if [ -n "$install_real" ] && [ "$ROOT" != "$install_real" ] && [ -f "$install_re
   exec bash "$install_real/tools/update.sh" ${ORIG_ARGS[@]+"${ORIG_ARGS[@]}"}
 fi
 
-g rev-parse --git-dir >/dev/null 2>&1 || { say "update: $ROOT is not a git clone; reinstall with git clone" >&2; exit 1; }
+g rev-parse --git-dir >/dev/null 2>&1 || { say "update: $ROOT is not a git clone; reinstall with tools/bootstrap.sh (see README, 'Install')" >&2; exit 1; }
 
 if ! g fetch --tags --quiet origin 2>/dev/null; then
   if [ "$CHECK" -eq 1 ]; then say "update: could not reach origin (offline?); skipped"; exit 0; fi
@@ -98,7 +98,7 @@ fi
 # Never overwrite work: refuse on a dirty tree or on a branch with commits that are not on origin.
 if [ -n "$(g status --porcelain --untracked-files=no)" ]; then
   say "update: $ROOT has uncommitted changes. This looks like a development clone;" >&2
-  say "        install releases in a separate clone (see README, 'Install a release')." >&2
+  say "        the installed copy comes from tools/install.sh or tools/bootstrap.sh (see README, 'Install')." >&2
   exit 1
 fi
 branch="$(g symbolic-ref -q --short HEAD || true)"

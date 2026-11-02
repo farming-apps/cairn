@@ -40,22 +40,31 @@ their client's syntax: `CLAUDE.md` → `@AGENTS.md` (Claude Code); `GEMINI.md` �
 Requirements: `git` and `python3` (3.9+, standard library only). On macOS both come with the Xcode
 Command Line Tools (`xcode-select --install`).
 
-Client hooks store an absolute path, so they must point at a **release** in a stable place you do
-not develop in; otherwise uncommitted work in a dev clone would run live in every session.
-`install.sh` takes care of that from any clone:
+One command, no clone needed:
 ```sh
-git clone <tool-repo> ~/dev/ai-memory                    # your clone: develop here
-~/dev/ai-memory/tools/install.sh --data ~/ai-memory-data # creates the memory repo if missing, or clone yours first
-~/dev/ai-memory/tools/doctor.sh                          # --module hardening,memory,mcp,projects (all by default)
+curl -fsSL https://raw.githubusercontent.com/milyzc/ai-memory/main/tools/bootstrap.sh | bash -s -- --data ~/ai-memory-data
+~/.local/share/ai-memory/tools/doctor.sh   # --module hardening,memory,mcp,projects (all by default)
 ```
-The first run checks out the latest release tag (`origin/main` before the first release) in a detached
-worktree at `~/.local/share/ai-memory` (`AI_MEMORY_INSTALL_DIR` overrides it) and re-runs itself from
-there. Hooks, the status line and the memory repo's pre-commit hook point at that installed copy, so
-switching branches in your clone does not change them. Later runs reuse it as it is; only `update.sh`
-moves it. A plain `git clone --branch vX.Y.Z <tool-repo> ~/.local/share/ai-memory` works too.
-`--dev` skips the installed copy and wires the clients to the clone as it is, to try a branch; the
-single-repo layout (memory inside the clone) always installs this way. `doctor.sh` fails if the
-installed copy has local changes.
+`bootstrap.sh` clones the tool into `~/.local/share/ai-memory` (`AI_MEMORY_INSTALL_DIR` overrides it),
+checks out the latest release tag (`origin/main` before the first release) and runs `install.sh` from
+there with the same arguments. `--data` creates the memory repo if missing (or clone yours there first);
+without it, `~/ai-memory-data` is used. Client hooks, the status line and the memory repo's pre-commit
+hook point at that installed copy; only `update.sh` changes its version. `doctor.sh` fails if the
+installed copy has local changes. To review the script first, download it, read it, then run it with
+`bash bootstrap.sh --data ~/ai-memory-data`.
+
+### Development
+Client hooks store an absolute path, so they must not point at a clone you develop in; otherwise
+uncommitted work would run live in every session. From a dev clone, `install.sh` takes care of that:
+```sh
+git clone <tool-repo> ~/dev/ai-memory
+~/dev/ai-memory/tools/install.sh --data ~/ai-memory-data
+```
+When there is no installed copy yet, it is created as a detached `git worktree` of the clone (latest
+release tag, or `origin/main` before the first one) and `install.sh` re-runs itself from there. That
+worktree depends on the clone, so use `bootstrap.sh` on machines where you do not develop. Later runs
+reuse the installed copy as it is. `--dev` skips it and wires the clients to the clone as it is, to try
+a branch; the single-repo layout (memory inside the clone) always installs this way.
 
 ### Update
 ```sh
@@ -64,7 +73,8 @@ tools/update.sh --check    # only report (doctor.sh does this too)
 tools/update.sh --to v0.1.0  # pin or roll back
 tools/update.sh --channel main  # follow main instead of releases
 ```
-Run from your clone or from the installed copy: when the installed copy exists, that is what moves.
+The first install is `bootstrap.sh` (or `install.sh`), not `update.sh`. Run `update.sh` from the
+installed copy or from a dev clone: when the installed copy exists, that is what moves.
 `update.sh` refuses to move a clone with uncommitted changes or local commits. Your memory repo is
 never committed to: skeleton files added by a new release are listed and copied only if you accept,
 and layout migrations (`migrations/NNN-*.sh`, see `migrations/README.md`) run only after asking. Both
@@ -188,6 +198,10 @@ exclude. If you later work inside one of those repos directly, drop its `memory:
 - The model **does not write** to those files. What it proposes lands in `memory/` (git-ignored).
 - You review and promote: `tools/promote.sh my-app state` (or `decisions`), which runs `sanitize.py`
   and checks the token limit before appending anything. `--clear` empties `memory/`.
+- **Plans** stay where the client keeps them (Claude Code: `~/.claude/plans/`). Only a plan left
+  pending, or one you ask to keep, is saved to `projects/<p>/plans/YYYY-MM-DD-<slug>.md` (versioned,
+  so it travels to your other machines); the model deletes it once executed. The status line shows
+  how many are waiting (`· 1 plan`). The rule lives in `global/AGENTS.md`.
 - Commit in the memory repo → the hook runs `gitleaks`, `sanitize.py` and `check-size.sh` on what is *staged*.
 - On another machine: `git pull` the memory repo; the next session already sees it.
 
