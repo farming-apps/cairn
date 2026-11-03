@@ -80,8 +80,9 @@ def check_values(name, field, values):
         if SECRET_KEY_RX.search(k) and not refs:
             problems.append(f"{name}.{field}.{k}: looks secret; write it as a reference, e.g. \"${{{k.upper()}}}\"")
         for var in refs:
-            if var not in os.environ:
-                warnings.append(f"{name}: ${{{var}}} is not set in this environment")
+            if not os.environ.get(var, "").strip():
+                warnings.append(f"{name}: ${{{var}}} is unset or empty in this environment; clients launched "
+                                f"without it send an empty value (export it in ~/.zshenv and restart the client)")
 
 
 def check_pinned(name, command, args):
