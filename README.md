@@ -101,7 +101,7 @@ and merges `policy/claude/settings.json` + `<data>/settings/claude/settings.json
 appear under *Memory files* and with `/hooks` that `guard-bash` is active.
 
 ## Environment variables
-All optional. Export them in `~/.zshrc` or similar; no script loads `.env.example`.
+All optional. Export them in `~/.zshrc` or similar.
 
 | Variable | Read by | Purpose | Default |
 |---|---|---|---|

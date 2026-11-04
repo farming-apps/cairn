@@ -1,7 +1,6 @@
 # Secrets and per-machine local config
 .env
 .env.*
-!.env.example
 *.pem
 *.key
 *.p12
