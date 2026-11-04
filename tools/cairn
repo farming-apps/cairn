@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# cairn: single entry point for the tool's scripts. install.sh links it as ~/.local/bin/cairn.
+#
+# Usage: cairn <command> [args...]
+#   install [...]                 prepare this machine (tools/install.sh)
+#   doctor [...]                  check the installation (tools/doctor.sh)
+#   update [...]                  move the installed copy to another release (tools/update.sh)
+#   project add <name> [repo] [...]  create a project memory and connect a work repo (tools/new-project.sh)
+#   project list|sync|encrypt|decrypt [...]  projects registry (tools/projects.sh)
+#   promote <project> <state|decisions> [...]  promote memory/ proposals (tools/promote.sh)
+#   build <project>               regenerate the flat bundles in <data>/build (tools/build.sh)
+#   ask [-p project] "question"   ask a local / OpenAI-compatible model (tools/ai)
+#   version                       print the tool version and where it runs from
+#   help                          this text
+set -euo pipefail
+
+# Resolve the real location through the ~/.local/bin symlink, so the scripts find lib.sh next to them.
+src="${BASH_SOURCE[0]}"
+while [ -L "$src" ]; do
+  dir="$(cd "$(dirname "$src")" && pwd -P)"
+  src="$(readlink "$src")"
+  case "$src" in /*) ;; *) src="$dir/$src" ;; esac
+done
+TOOLS="$(cd "$(dirname "$src")" && pwd -P)"
+
+usage() { awk 'NR>3 && /^set -euo pipefail/{exit} NR>3{sub(/^# ?/, ""); print}' "$TOOLS/cairn"; }
+
+cmd="${1:-help}"; [ $# -gt 0 ] && shift
+case "$cmd" in
+  install)  exec bash "$TOOLS/install.sh" "$@" ;;
+  doctor)   exec bash "$TOOLS/doctor.sh" "$@" ;;
+  update)   exec bash "$TOOLS/update.sh" "$@" ;;
+  promote)  exec bash "$TOOLS/promote.sh" "$@" ;;
+  build)    exec bash "$TOOLS/build.sh" "$@" ;;
+  ask)      exec python3 "$TOOLS/ai" "$@" ;;
+  project|projects)
+    sub="${1:-}"; [ $# -gt 0 ] && shift
+    case "$sub" in
+      add|new)                     exec bash "$TOOLS/new-project.sh" "$@" ;;
+      list|sync|encrypt|decrypt)   exec bash "$TOOLS/projects.sh" "$sub" "$@" ;;
+      *) echo "cairn project: expected add, list, sync, encrypt or decrypt" >&2; exit 2 ;;
+    esac ;;
+  version|--version|-V)
+    root="$(cd "$TOOLS/.." && pwd -P)"
+    printf 'cairn %s (%s)\n' "$(tr -d '[:space:]' <"$root/VERSION" 2>/dev/null || echo unknown)" "$root" ;;
+  help|-h|--help) usage ;;
+  *) echo "cairn: unknown command '$cmd'" >&2; usage >&2; exit 2 ;;
+esac

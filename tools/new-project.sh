@@ -14,8 +14,8 @@
 # In the work repo it writes (all excluded in .git/info/exclude):
 #   CLAUDE.local.md                              Claude Code imports of AGENTS.md and state.md
 #   .claude/settings.local.json                  autoMemoryDirectory -> projects/<name>/memory
-#   GEMINI.md (or .agents/rules/ai-memory.md)    Antigravity CLI @[label](path) includes
-#   .github/instructions/ai-memory.instructions.md  GitHub Copilot CLI symlink -> build/<name>/copilot.instructions.md
+#   GEMINI.md (or .agents/rules/cairn.md)    Antigravity CLI @[label](path) includes
+#   .github/instructions/cairn.instructions.md  GitHub Copilot CLI symlink -> build/<name>/copilot.instructions.md
 #   .claude/skills/<s*> & .agents/skills/<s*>    shared skills from skills/ and projects/<name>/skills/
 set -euo pipefail
 
@@ -128,31 +128,36 @@ fi
 excluded+=(".claude/settings.local.json")
 
 say "4. Antigravity CLI / Gemini in $repo"
-# Use .agents/rules/ai-memory.md if GEMINI.md is tracked by git or already has non-ai-memory content.
+# Use .agents/rules/cairn.md if GEMINI.md is tracked by git or already has non-cairn content.
 use_agy_rule=0
 if git -C "$repo" ls-files --error-unmatch GEMINI.md >/dev/null 2>&1; then
   use_agy_rule=1
-elif [ -f "$repo/GEMINI.md" ] && ! grep -qF "@[ai-memory]" "$repo/GEMINI.md" 2>/dev/null; then
+elif [ -f "$repo/GEMINI.md" ] && ! grep -qE '@\[(cairn|ai-memory)\]' "$repo/GEMINI.md" 2>/dev/null; then
   use_agy_rule=1
 fi
 if [ "$use_agy_rule" -eq 1 ]; then
-  rule="$repo/.agents/rules/ai-memory.md"
-  say "  the repo already has its own GEMINI.md; using .agents/rules/ai-memory.md"
+  rule="$repo/.agents/rules/cairn.md"
+  say "  the repo already has its own GEMINI.md; using .agents/rules/cairn.md"
+  old_rule="$repo/.agents/rules/ai-memory.md"   # name before the rename to cairn
+  if [ -f "$old_rule" ]; then
+    if [ -f "$rule" ]; then say "  remove the pre-rename $old_rule"; run rm -f "$old_rule"
+    else say "  rename the pre-rename $old_rule -> cairn.md"; run mv "$old_rule" "$rule"; fi
+  fi
   if [ ! -f "$rule" ]; then
     if [ "$DRY" -eq 1 ]; then say "  + create $rule"; else
       mkdir -p "$(dirname "$rule")"
-      printf -- '---\ntrigger: always_on\ndescription: project memory (ai-memory)\n---\n' >"$rule"
+      printf -- '---\ntrigger: always_on\ndescription: project memory (cairn)\n---\n' >"$rule"
     fi
   fi
-  agy_agents="@[ai-memory]($DATA_TILDE/projects/$name/AGENTS.md)"
+  agy_agents="@[cairn]($DATA_TILDE/projects/$name/AGENTS.md)"
   agy_state="@[state]($DATA_TILDE/projects/$name/state.md)"
   drop_stale_lines "$rule" "$agy_agents" "$agy_state"
   ensure_line "$rule" "$agy_agents"
   ensure_line "$rule" "$agy_state"
-  excluded+=(".agents/rules/ai-memory.md")
+  excluded+=(".agents/rules/cairn.md")
 else
   [ -f "$repo/GEMINI.md" ] && say "  ok   GEMINI.md" || say "  create GEMINI.md"
-  agy_agents="@[ai-memory]($DATA_TILDE/projects/$name/AGENTS.md)"
+  agy_agents="@[cairn]($DATA_TILDE/projects/$name/AGENTS.md)"
   agy_state="@[state]($DATA_TILDE/projects/$name/state.md)"
   drop_stale_lines "$repo/GEMINI.md" "$agy_agents" "$agy_state"
   ensure_line "$repo/GEMINI.md" "$agy_agents"
@@ -162,15 +167,17 @@ fi
 
 say "5. GitHub Copilot CLI in $repo"
 run "$ROOT/tools/build.sh" "$name" >/dev/null
-copilot_instr="$repo/.github/instructions/ai-memory.instructions.md"
+copilot_instr="$repo/.github/instructions/cairn.instructions.md"
+old_instr="$repo/.github/instructions/ai-memory.instructions.md"   # name before the rename to cairn
+if [ -L "$old_instr" ]; then say "  remove the pre-rename link $old_instr"; run rm -f "$old_instr"; fi
 if [ "$DRY" -eq 1 ]; then
   say "  + link $copilot_instr -> build/$name/copilot.instructions.md"
 else
   mkdir -p "$(dirname "$copilot_instr")"
   ln -sfn "$BUILD_DIR/$name/copilot.instructions.md" "$copilot_instr"
-  say "  link .github/instructions/ai-memory.instructions.md -> build/$name/copilot.instructions.md"
+  say "  link .github/instructions/cairn.instructions.md -> build/$name/copilot.instructions.md"
 fi
-excluded+=(".github/instructions/ai-memory.instructions.md")
+excluded+=(".github/instructions/cairn.instructions.md")
 
 say "6. Shared skills (Claude Code, Antigravity CLI, GitHub Copilot CLI)"
 skill_count=0

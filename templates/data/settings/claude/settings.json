@@ -4,7 +4,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "bash \"{{AI_MEMORY_ROOT}}/tools/statusline.sh\" # ai-memory",
+    "command": "bash \"{{CAIRN_ROOT}}/tools/statusline.sh\" # cairn",
     "padding": 0
   },
   "attribution": {

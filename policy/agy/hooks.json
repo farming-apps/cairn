@@ -1,16 +1,17 @@
 {
-  "ai-memory": {
+  "cairn": {
     "PreToolUse": [
       {
         "matcher": "run_command",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -I \"{{AI_MEMORY_ROOT}}/tools/guard-bash.py\"",
+            "command": "python3 -I \"{{CAIRN_ROOT}}/tools/guard-bash.py\"",
             "timeout": 5
           }
         ]
       }
     ]
-  }
+  },
+  "ai-memory": null
 }

@@ -63,7 +63,7 @@ if command -v agy >/dev/null 2>&1 || command -v gemini >/dev/null 2>&1 || [ -f "
 if command -v copilot >/dev/null 2>&1 || [ -f "$COPILOT_DIR/settings.json" ] || [ -f "$COPILOT_DIR/copilot-instructions.md" ]; then has_copilot=1; fi
 
 HOOK_ROOT="$(hook_root)"   # what client hooks and the memory repo's core.hooksPath must point to
-echo "ai-memory: $(ai_memory_version) at $ROOT (modules: $MODULES)"
+echo "cairn: $(cairn_version) at $ROOT (modules: $MODULES)"
 if data_is_separate; then echo "memory:    $DATA (layout $(data_layout))"; else echo "memory:    $ROOT (single-repo layout)"; fi
 if [ "$HOOK_ROOT" != "$ROOT" ]; then echo "installed: $HOOK_ROOT"; fi
 
@@ -75,7 +75,7 @@ elif data_is_separate && [ "$(data_layout)" -lt "$DATA_LAYOUT_SUPPORTED" ]; then
 else
   ok "memory repo layout $(data_layout) supported"
 fi
-if [ "${AI_MEMORY_NO_UPDATE_CHECK:-0}" != 1 ]; then   # set it to 1 to skip the network call
+if [ "${CAIRN_NO_UPDATE_CHECK:-0}" != 1 ]; then   # set it to 1 to skip the network call
   upd="$("$ROOT/tools/update.sh" --check 2>&1 | tail -1)" || true
   case "$upd" in
     "update available"*) warn "$upd" ;;
@@ -146,16 +146,16 @@ except Exception as e:
 ok = True
 deny = d.get("permissions", {}).get("deny", [])
 if not any(r.startswith("Bash(rm -rf") for r in deny):
-    print("  FAIL settings.json has no ai-memory deny rules (tools/install.sh)"); ok = False
+    print("  FAIL settings.json has no cairn deny rules (tools/install.sh)"); ok = False
 hooks = [h for e in d.get("hooks", {}).get("PreToolUse", []) for h in e.get("hooks", [])
-         if "# ai-memory" in (h.get("command") or "")]
+         if "# cairn" in (h.get("command") or "")]
 if not hooks:
     print("  FAIL settings.json has no guard-bash hook (tools/install.sh)"); ok = False
 elif root + "/tools/guard-bash.py" not in hooks[0]["command"]:
     print("  FAIL the guard-bash hook points to another path; re-run tools/install.sh"); ok = False
 sl = d.get("statusLine") or {}
 if root + "/tools/statusline.sh" not in (sl.get("command") or ""):
-    print("  WARN settings.json has no ai-memory statusLine (a preference in <data>/settings/claude/settings.json)")
+    print("  WARN settings.json has no cairn statusLine (a preference in <data>/settings/claude/settings.json)")
 if ok:
     print(f"  OK   claude: policy applied ({len(deny)} deny, {len(d['permissions'].get('ask', []))} ask), guard-bash hook")
 sys.exit(0 if ok else 1)
@@ -184,21 +184,21 @@ try:
         extra = "statusLine" if root + "/tools/statusline.sh" in sl else "NO statusLine (tools/install.sh)"
         print(f"  OK   agy: policy applied ({len(deny)} deny, {len(s['permissions'].get('ask', []))} ask), {extra}")
     else:
-        print("  FAIL agy: antigravity-cli/settings.json has no ai-memory deny rules (tools/install.sh)"); ok = False
+        print("  FAIL agy: antigravity-cli/settings.json has no cairn deny rules (tools/install.sh)"); ok = False
 except FileNotFoundError:
     print(f"  FAIL agy: {settings} does not exist (tools/install.sh)"); ok = False
 except Exception as e:
     print(f"  FAIL agy: {settings} is not valid JSON: {e}"); ok = False
 try:
     h = json.load(open(hooks_path, encoding="utf-8"))
-    entry = h.get("ai-memory", {})
+    entry = h.get("cairn", {})
     cmds = [x.get("command", "") for g in entry.get("PreToolUse", []) for x in g.get("hooks", [])]
     if not cmds:
-        print("  FAIL agy: config/hooks.json has no ai-memory key (tools/install.sh)"); ok = False
+        print("  FAIL agy: config/hooks.json has no cairn key (tools/install.sh)"); ok = False
     elif root + "/tools/guard-bash.py" not in cmds[0]:
-        print("  FAIL agy: the ai-memory hook points to another path; re-run tools/install.sh"); ok = False
+        print("  FAIL agy: the cairn hook points to another path; re-run tools/install.sh"); ok = False
     else:
-        others = [k for k in h if k != "ai-memory"]
+        others = [k for k in h if k != "cairn"]
         print(f"  OK   agy: guard-bash hook in hooks.json (other hooks kept: {', '.join(others) or 'none'})")
 except FileNotFoundError:
     print(f"  FAIL agy: {hooks_path} does not exist (tools/install.sh)"); ok = False
@@ -235,11 +235,11 @@ cmd = (d.get("statusLine") or {}).get("command") or ""
 if root + "/tools/statusline.sh" in cmd:
     print("  OK   copilot: statusLine points to tools/statusline.sh")
 else:
-    print("  WARN copilot: no ai-memory statusLine (a preference in <data>/settings/copilot/settings.json)")
+    print("  WARN copilot: no cairn statusLine (a preference in <data>/settings/copilot/settings.json)")
 hooks = (d.get("hooks") or {}).get("PreToolUse") or []
-mine = [h for h in hooks if isinstance(h, dict) and "# ai-memory" in (h.get("bash") or h.get("command") or "")]
+mine = [h for h in hooks if isinstance(h, dict) and "# cairn" in (h.get("bash") or h.get("command") or "")]
 if not mine:
-    print("  FAIL copilot: settings.json has no ai-memory PreToolUse hook (tools/install.sh)"); ok = False
+    print("  FAIL copilot: settings.json has no cairn PreToolUse hook (tools/install.sh)"); ok = False
 elif root + "/tools/guard-bash.py" not in mine[0].get("bash", "") or "--out copilot" not in mine[0].get("bash", ""):
     print("  FAIL copilot: the guard-bash hook points elsewhere or lacks --out copilot; re-run tools/install.sh"); ok = False
 else:
@@ -346,10 +346,10 @@ if has_module memory; then
   echo "GitHub Copilot CLI (memory)"
   if [ "$has_copilot" -eq 1 ]; then
     copilot_mem="$COPILOT_DIR/copilot-instructions.md"
-    if [ -f "$copilot_mem" ] && grep -q "ai-memory" "$copilot_mem" 2>/dev/null; then
-      ok "$copilot_mem (ai-memory block present)"
+    if [ -f "$copilot_mem" ] && grep -q "cairn" "$copilot_mem" 2>/dev/null; then
+      ok "$copilot_mem (cairn block present)"
     else
-      fail "copilot: $copilot_mem missing or has no ai-memory block (run tools/install.sh)"
+      fail "copilot: $copilot_mem missing or has no cairn block (run tools/install.sh)"
     fi
   else
     warn "copilot not installed (skipped)"
@@ -387,7 +387,7 @@ fi
 # =============================================================================================
 # MODULE 3: PROJECTS
 # =============================================================================================
-PROJECTS_FILE="${AI_MEMORY_PROJECTS:-$LOCAL_DIR/projects.yml}"; PROJECTS_FILE="${PROJECTS_FILE/#\~/$HOME}"
+PROJECTS_FILE="${CAIRN_PROJECTS:-$LOCAL_DIR/projects.yml}"; PROJECTS_FILE="${PROJECTS_FILE/#\~/$HOME}"
 if has_module projects || [ "${#args_repos[@]}" -gt 0 ]; then
   echo
   echo "=== Module: projects ==="
@@ -407,14 +407,14 @@ if has_module projects || [ "${#args_repos[@]}" -gt 0 ]; then
     else
       warn "no autoMemoryDirectory: Claude auto-memory will go to the default directory"
     fi
-    if [ -f "$repo/.agents/rules/ai-memory.md" ]; then
-      check_imports "$repo/.agents/rules/ai-memory.md"
+    if [ -f "$repo/.agents/rules/cairn.md" ]; then
+      check_imports "$repo/.agents/rules/cairn.md"
     elif [ -f "$repo/GEMINI.md" ]; then
       check_imports "$repo/GEMINI.md"
     else
-      fail "no GEMINI.md or .agents/rules/ai-memory.md for agy (tools/new-project.sh <name> $repo)"
+      fail "no GEMINI.md or .agents/rules/cairn.md for agy (tools/new-project.sh <name> $repo)"
     fi
-    copilot_instr="$repo/.github/instructions/ai-memory.instructions.md"
+    copilot_instr="$repo/.github/instructions/cairn.instructions.md"
     if [ -f "$copilot_instr" ]; then
       ok "$copilot_instr (copilot instructions ready)"
     else
@@ -422,7 +422,7 @@ if has_module projects || [ "${#args_repos[@]}" -gt 0 ]; then
     fi
     if ! git -C "$repo" rev-parse --git-dir >/dev/null 2>&1; then
       ok "workspace folder (not a git repository: no git status to keep clean)"
-    elif [ -n "$(git -C "$repo" status --porcelain -- CLAUDE.local.md .claude/settings.local.json .claude/skills GEMINI.md .agents/rules/ai-memory.md .agents/skills .github/instructions/ai-memory.instructions.md 2>/dev/null)" ]; then
+    elif [ -n "$(git -C "$repo" status --porcelain -- CLAUDE.local.md .claude/settings.local.json .claude/skills GEMINI.md .agents/rules/cairn.md .agents/skills .github/instructions/cairn.instructions.md 2>/dev/null)" ]; then
       fail "personal files visible in the repo's git status (check .git/info/exclude)"
     else
       ok "git status clean of personal files"

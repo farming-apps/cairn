@@ -1,4 +1,4 @@
-# ai-memory
+# cairn
 
 Portable AI memory and configuration across machines and across models (Claude Code, Antigravity CLI,
 GitHub Copilot CLI, local models), with nothing sensitive travelling along. Everything is Markdown
@@ -8,7 +8,7 @@ Two repositories:
 - **this one, the tool** (public): scripts, client policies, hooks and the skeleton of a memory repo.
 - **your memory repo** (private): `global/`, `projects/`, `skills/`, `prompts/`, `presets/`.
   Created from `templates/data/` by `install.sh --data <path>`; the tools find it through
-  `AI_MEMORY_PROJECTS_DATA` or `~/.config/ai-memory/env`. Without either, memory is expected inside this repo
+  `CAIRN_DATA` or `~/.config/cairn/env`. Without either, memory is expected inside this repo
   (single-repo layout, as in early versions).
 
 ## Layout
@@ -42,23 +42,50 @@ Command Line Tools (`xcode-select --install`).
 
 One command, no clone needed:
 ```sh
-curl -fsSL https://raw.githubusercontent.com/milyzc/ai-memory/main/tools/bootstrap.sh | bash -s -- --data ~/ai-memory-data
-~/.local/share/ai-memory/tools/doctor.sh   # --module hardening,memory,mcp,projects (all by default)
+curl -fsSL https://raw.githubusercontent.com/farming-apps/cairn/main/tools/bootstrap.sh | bash -s -- --data ~/cairn-data
+cairn doctor   # --module hardening,memory,mcp,projects (all by default)
 ```
-`bootstrap.sh` clones the tool into `~/.local/share/ai-memory` (`AI_MEMORY_INSTALL_DIR` overrides it),
+`install.sh` links the `cairn` command into `~/.local/bin` (`CAIRN_BIN_DIR` overrides it; add the
+directory to `PATH` if it is not there). It is one entry point for the scripts in `tools/`:
+
+| Command | Runs |
+|---|---|
+| `cairn install [...]` / `cairn doctor` / `cairn update` | `install.sh` / `doctor.sh` / `update.sh` |
+| `cairn project add <name> [repo]` | `new-project.sh` |
+| `cairn project list\|sync\|encrypt\|decrypt` | `projects.sh` |
+| `cairn promote <project> state\|decisions` | `promote.sh` |
+| `cairn build <project>` · `cairn ask "question"` | `build.sh` · `ai` (local models) |
+| `cairn version` · `cairn help` | |
+
+`bootstrap.sh` clones the tool into `~/.local/share/cairn` (`CAIRN_INSTALL_DIR` overrides it),
 checks out the latest release tag (`origin/main` before the first release) and runs `install.sh` from
 there with the same arguments. `--data` creates the memory repo if missing (or clone yours there first);
-without it, `~/ai-memory-data` is used. Client hooks, the status line and the memory repo's pre-commit
+without it, `~/cairn-data` is used. Client hooks, the status line and the memory repo's pre-commit
 hook point at that installed copy; only `update.sh` changes its version. `doctor.sh` fails if the
 installed copy has local changes. To review the script first, download it, read it, then run it with
-`bash bootstrap.sh --data ~/ai-memory-data`.
+`bash bootstrap.sh --data ~/cairn-data`.
+
+### Upgrading from ai-memory
+The tool was called ai-memory before v1.0.0. On a machine installed with the old name, run the old
+copy's `update.sh` once (`~/.local/share/ai-memory/tools/update.sh`); the new `install.sh` then:
+- moves `~/.config/ai-memory/` to `~/.config/cairn/` (the `AI_MEMORY_PROJECTS_DATA` line in its `env`
+  is still read and is rewritten as `CAIRN_DATA` on the next `--data`);
+- creates the installed copy in `~/.local/share/cairn` and points every client hook there; delete
+  `~/.local/share/ai-memory` once `cairn doctor` passes;
+- replaces the hooks and the `CLAUDE.md`/`GEMINI.md` blocks marked `ai-memory` instead of adding new ones;
+- offers migration `003-rename-cairn.sh` for the memory repo (`.ai-memory-layout` → `.cairn-layout`,
+  `{{AI_MEMORY_*}}` placeholders and `# ai-memory` markers in `settings/`); commit it afterwards.
+
+Then run `cairn project sync` (or `new-project.sh` per repo) to rename the bridges in your work repos
+(`.agents/rules/cairn.md`, `.github/instructions/cairn.instructions.md`), and rename `AI_MEMORY_*`
+variables in your shell profile to `CAIRN_*` (the old names still work for now, with a warning).
 
 ### Development
 Client hooks store an absolute path, so they must not point at a clone you develop in; otherwise
 uncommitted work would run live in every session. From a dev clone, `install.sh` takes care of that:
 ```sh
-git clone <tool-repo> ~/dev/ai-memory
-~/dev/ai-memory/tools/install.sh --data ~/ai-memory-data
+git clone <tool-repo> ~/dev/cairn
+~/dev/cairn/tools/install.sh --data ~/cairn-data
 ```
 When there is no installed copy yet, it is created as a detached `git worktree` of the clone (latest
 release tag, or `origin/main` before the first one) and `install.sh` re-runs itself from there. That
@@ -79,7 +106,7 @@ installed copy or from a dev clone: when the installed copy exists, that is what
 never committed to: skeleton files added by a new release are listed and copied only if you accept,
 and layout migrations (`migrations/NNN-*.sh`, see `migrations/README.md`) run only after asking. Both
 leave changes unstaged for you to review with `git status` and commit. The layout of the memory repo
-is the integer in `<data>/.ai-memory-layout` (missing means 1); a tool that is too old for it stops.
+is the integer in `<data>/.cairn-layout` (missing means 1); a tool that is too old for it stops.
 
 ### Releasing
 Commits to `main` follow [Conventional Commits](https://www.conventionalcommits.org): `fix:` → patch,
@@ -87,7 +114,7 @@ Commits to `main` follow [Conventional Commits](https://www.conventionalcommits.
 a release PR open; merging it bumps `VERSION`, updates `CHANGELOG.md` and tags `vX.Y.Z`, which is what
 `update.sh` installs.
 
-`--data` is remembered in `~/.config/ai-memory/env`; later runs do not need it. On a second machine,
+`--data` is remembered in `~/.config/cairn/env`; later runs do not need it. On a second machine,
 clone your private memory repo first and point `--data` at it.
 
 None of the three supported AI clients (**Claude Code**, **Antigravity CLI `agy`**, **GitHub Copilot CLI `copilot`**) is mandatory: `install.sh` and `doctor.sh` auto-detect which ones are installed on the machine and skip the rest without failing. You can also run a single module with `--module hardening`, `--module memory`, `--module mcp`, or `--module projects`.
@@ -95,23 +122,25 @@ None of the three supported AI clients (**Claude Code**, **Antigravity CLI `agy`
 blocks commits without it) and `jq` (status line) are offered for install with Homebrew, asking
 before each one; without Homebrew it tells you what to install and goes on. Then it writes an import
 block into `~/.claude/CLAUDE.md` (and `~/.gemini/GEMINI.md` if you use Gemini), enables the hooks in
-both repos, creates `<data>/global/profile.private.md` and `~/.config/ai-memory/forbidden-terms.txt`,
+both repos, creates `<data>/global/profile.private.md` and `~/.config/cairn/forbidden-terms.txt`,
 and merges `policy/claude/settings.json` + `<data>/settings/claude/settings.json` into `~/.claude/settings.json` while keeping yours (`theme`,
 `model`, `permissions.allow`, your own hooks). In a new session, check with `/context` that the files
 appear under *Memory files* and with `/hooks` that `guard-bash` is active.
 
 ## Environment variables
-All optional. Export them in `~/.zshrc` or similar.
+All optional. Export them in `~/.zshrc` or similar. The pre-rename `AI_MEMORY_*` names
+(`AI_MEMORY_PROJECTS_DATA` for `CAIRN_DATA`, the rest one to one) are still read, with a warning.
 
 | Variable | Read by | Purpose | Default |
 |---|---|---|---|
-| `AI_MEMORY_PROJECTS_DATA` | every script (via `tools/lib.sh`), `tools/ai` | Path of the memory repo: `global/`, `projects/`, `skills/` | the `AI_MEMORY_PROJECTS_DATA` line in `$AI_MEMORY_LOCAL/env` (written by `install.sh --data`), else this repo |
-| `AI_MEMORY_INSTALL_DIR` | `tools/install.sh`, `tools/doctor.sh` (via `tools/lib.sh`) | Installed copy (detached worktree at a release) that client hooks point to | `~/.local/share/ai-memory` |
-| `AI_MEMORY_LOCAL` | every script | Per-machine config dir, never versioned: `forbidden-terms.txt`, `env`, `projects.yml` | `~/.config/ai-memory` |
-| `AI_MEMORY_PROJECTS` | `projects.sh`, `doctor.sh` | Path of the projects registry | `$AI_MEMORY_LOCAL/projects.yml` |
-| `AI_MEMORY_PROJECTS_ENC` | `projects.sh encrypt/decrypt` | Default path of the encrypted registry backup | none (pass it as an argument) |
-| `AI_MEMORY_GUARD_NEUTRAL` | `guard-bash.py` (agy only) | Decision returned to agy when the guard has no objection | `ask` |
-| `AI_MEMORY_CHARS_PER_TOKEN` | `check-size.sh` | Characters per token for the size estimate | `4` |
+| `CAIRN_DATA` | every script (via `tools/lib.sh`), `tools/ai` | Path of the memory repo: `global/`, `projects/`, `skills/` | the `CAIRN_DATA` line in `$CAIRN_LOCAL/env` (written by `install.sh --data`), else this repo |
+| `CAIRN_INSTALL_DIR` | `tools/install.sh`, `tools/doctor.sh` (via `tools/lib.sh`) | Installed copy (detached worktree at a release) that client hooks point to | `~/.local/share/cairn` |
+| `CAIRN_BIN_DIR` | `tools/install.sh` | Where the `cairn` command is linked | `~/.local/bin` |
+| `CAIRN_LOCAL` | every script | Per-machine config dir, never versioned: `forbidden-terms.txt`, `env`, `projects.yml` | `~/.config/cairn` |
+| `CAIRN_PROJECTS` | `projects.sh`, `doctor.sh` | Path of the projects registry | `$CAIRN_LOCAL/projects.yml` |
+| `CAIRN_PROJECTS_ENC` | `projects.sh encrypt/decrypt` | Default path of the encrypted registry backup | none (pass it as an argument) |
+| `CAIRN_GUARD_NEUTRAL` | `guard-bash.py` (agy only) | Decision returned to agy when the guard has no objection | `ask` |
+| `CAIRN_CHARS_PER_TOKEN` | `check-size.sh` | Characters per token for the size estimate | `4` |
 | `AI_ENDPOINT` | `tools/ai` | OpenAI-compatible base URL | `$OLLAMA_HOST/v1`, else `http://localhost:11434/v1` |
 | `AI_MODEL` | `tools/ai` | Model name on the server | required |
 | `AI_API_KEY_VAR` | `tools/ai` | NAME of the variable that holds the key, never the key itself | none |
@@ -120,9 +149,9 @@ To run the tools from any directory, point a variable of your own at this repo a
 by full path (or alias them). The scripts find `lib.sh` next to themselves, so do not symlink single
 scripts into another `PATH` directory:
 ```sh
-export AI_MEMORY_HOME=~/ai-memory          # read by no script; only for your shell
-alias ai-install="$AI_MEMORY_HOME/tools/install.sh"
-alias ai-doctor="$AI_MEMORY_HOME/tools/doctor.sh"
+export CAIRN_HOME=~/cairn          # read by no script; only for your shell
+alias ai-install="$CAIRN_HOME/tools/install.sh"
+alias ai-doctor="$CAIRN_HOME/tools/doctor.sh"
 ```
 If you move this repo, update that variable and re-run `install.sh`: client hooks store its absolute path.
 
@@ -152,8 +181,8 @@ One catalog, `<data>/mcp/servers.json`, describes the MCP servers you want every
 | Copilot CLI | `~/.copilot/mcp-config.json` (`mcpServers`, `type: local\|http`, `tools: ["*"]`) |
 | VS Code | `<user dir>/mcp.json` (`servers`; references become `${env:VAR}`) |
 
-- Only servers ai-memory created are updated or removed (their names live in
-  `~/.config/ai-memory/mcp-managed.json`); yours are kept, and a catalog name that collides with one
+- Only servers cairn created are updated or removed (their names live in
+  `~/.config/cairn/mcp-managed.json`); yours are kept, and a catalog name that collides with one
   of them is skipped with a warning. Every write leaves a `.bak.<timestamp>`.
 - Secret-looking `env`/`headers` values must be `${VAR}` references and URLs must not carry
   credentials, or the render fails. Values are never resolved: each client expands the reference
@@ -167,21 +196,21 @@ One catalog, `<data>/mcp/servers.json`, describes the MCP servers you want every
 ## Connect a project
 ```sh
 tools/new-project.sh my-app ~/dev/my-app
-# or track & sync multiple projects across sections from ~/.config/ai-memory/projects.yml:
+# or track & sync multiple projects across sections from ~/.config/cairn/projects.yml:
 tools/projects.sh list
 tools/projects.sh sync
 ```
 Creates `<data>/projects/my-app/` from the template and prepares the work repo for **Claude Code**, **Antigravity CLI (`agy`)** and **GitHub Copilot CLI (`copilot`)** at the same time — all excluded via `.git/info/exclude` so `git status` stays clean:
 - `CLAUDE.local.md` and `.claude/settings.local.json` (`autoMemoryDirectory` → `projects/my-app/memory/`)
-- `GEMINI.md` (or `.agents/rules/ai-memory.md` if the repo already tracks `GEMINI.md`)
-- `.github/instructions/ai-memory.instructions.md` → `<data>/build/my-app/copilot.instructions.md`
+- `GEMINI.md` (or `.agents/rules/cairn.md` if the repo already tracks `GEMINI.md`)
+- `.github/instructions/cairn.instructions.md` → `<data>/build/my-app/copilot.instructions.md`
 - `.claude/skills/*` and `.agents/skills/*` → shared skills from `skills/` and `projects/my-app/skills/`
 With `--agents` it also links a flat `AGENTS.md` for OpenCode/Codex/Aider. Re-running it (or
 `projects.sh sync`) after moving the memory repo repairs the bridges: imports to the old path are dropped.
 `projects.yml` fields: `path`, `status` (`active` is synced; `paused`/`archived` are listed only), `agents`,
-`memory: false` (registered repo with no ai-memory bridges or project memory) and `notes`. Unknown keys such
+`memory: false` (registered repo with no cairn bridges or project memory) and `notes`. Unknown keys such
 as `remote:` are ignored, so a repo manifest kept in your dotfiles can double as the registry: set
-`AI_MEMORY_PROJECTS` to its path.
+`CAIRN_PROJECTS` to its path.
 
 **Workspaces.** When you open the client in a plain folder that holds several repos, the client reads
 the bridges and `autoMemoryDirectory` of that folder, not of the repos inside it. Connect the folder
@@ -209,7 +238,7 @@ exclude. If you later work inside one of those repos directly, drop its `memory:
 ## Other clients
 - **Antigravity CLI (`agy`)**: `install.sh` detects it and writes `~/.gemini/GEMINI.md` (includes
   `@[…](…)`), the permissions in `~/.gemini/antigravity-cli/settings.json` and the hook in
-  `~/.gemini/config/hooks.json`. `new-project.sh` leaves a `GEMINI.md` (or `.agents/rules/ai-memory.md`
+  `~/.gemini/config/hooks.json`. `new-project.sh` leaves a `GEMINI.md` (or `.agents/rules/cairn.md`
   if the team already has one) in the work repo, excluded from git. Details in `policy/README.md`.
 - **OpenCode / Codex / Aider** do not resolve `@path`: use `tools/build.sh <p>` to generate a flat
   `<data>/build/<p>/AGENTS.md` (or `new-project.sh --agents`).
@@ -224,7 +253,7 @@ With 8K-context local models these limits matter more than with Claude or Gemini
 
 ## Security
 Three layers: what is versioned (rules, architecture with aliases, in the private memory repo), what is
-local per machine (`~/.config/ai-memory/`, `profile.private.md`) and secrets (Keychain, environment
+local per machine (`~/.config/cairn/`, `profile.private.md`) and secrets (Keychain, environment
 variables). The repos name variables, never their values. Details and the leak procedure in
 [docs/security.md](docs/security.md).
 

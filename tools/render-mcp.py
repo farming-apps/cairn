@@ -189,7 +189,7 @@ def json_target(path, key, desired, managed, mode):
     current = doc.get(key) if isinstance(doc.get(key), dict) else {}
     new, changed, removed, skipped = plan(current, desired, managed)
     for n in skipped:
-        warnings.append(f"{tilde(path)}: '{n}' already exists and is not managed by ai-memory; skipped")
+        warnings.append(f"{tilde(path)}: '{n}' already exists and is not managed by cairn; skipped")
     owned = sorted(n for n in desired if n not in skipped)
     if not changed and not removed:
         print(f"  ok   {tilde(path)} (no changes)")
@@ -219,7 +219,7 @@ def claude_target(desired, managed, mode):
     current = load(os.path.join(HOME, ".claude.json")).get("mcpServers") or {}
     _, changed, removed, skipped = plan(current, desired, managed)
     for n in skipped:
-        warnings.append(f"claude: '{n}' already exists in user scope and is not managed by ai-memory; skipped")
+        warnings.append(f"claude: '{n}' already exists in user scope and is not managed by cairn; skipped")
     owned = sorted(n for n in desired if n not in skipped)
     if not changed and not removed:
         print("  ok   claude user scope (no changes)")

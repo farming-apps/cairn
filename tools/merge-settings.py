@@ -2,7 +2,7 @@
 """Merges the client policy into the machine's real config file.
 
 Two sources, combined before touching the target:
-  FLOOR  ai-memory/policy/<client>/...json: the security baseline shipped with the tool
+  FLOOR  cairn/policy/<client>/...json: the security baseline shipped with the tool
          (deny/ask rules, guard-bash hooks, sandbox). It can never be weakened.
   PREFS  <data>/settings/<client>/settings.json: the user's preferences (defaultMode, statusLine,
          attribution, extra deny/ask...). Optional; it adds to the floor and can drop floor rules
@@ -19,18 +19,21 @@ Merge into the target (Claude Code, Antigravity CLI, Copilot CLI or VS Code sett
   - keys whose value is a dict (e.g. `permissions`): merged one level deep; the combined subkeys
     (deny, ask...) replace the target's and the rest (allow, defaultMode...) are kept.
   - `hooks`: for each event, managed entries are removed and the combined ones are added; user
-    hooks are kept. An entry is managed when `# ai-memory` appears in its command: Claude Code
+    hooks are kept. An entry is managed when `# cairn` appears in its command: Claude Code
     format (`{"matcher", "hooks": [{"command"}]}`) or Copilot CLI format (flat `{"bash"|"command"|"args"}`).
   - any other key replaces the target's.
 
 --replace-keys mode (Antigravity CLI hooks.json): each top-level key replaces the same-named key
-in the target; the rest of the file (e.g. the `cmux` key) is left untouched.
+in the target; the rest of the file (e.g. the `cmux` key) is left untouched. A key set to `null`
+is removed from the target.
 
 --check mode: makes no change; exits 1 and lists what is missing if the target does not contain
 the floor (every list item present, every other value equal; `hooks` are checked by doctor.sh).
 
-Substitutions in both sources: {{AI_MEMORY_ROOT}} -> tool repo, {{AI_MEMORY_DATA}} -> memory repo
+Substitutions in both sources: {{CAIRN_ROOT}} -> tool repo, {{CAIRN_DATA}} -> memory repo
 (--data, default the tool repo), {{HOME}} -> user's home.
+The pre-rename {{AI_MEMORY_ROOT}} and {{AI_MEMORY_DATA}} are still substituted, and entries marked
+`# ai-memory` are still recognised as managed (and replaced).
 
 --check mode with PREFS: checks against the floor minus PREFS' `floorRemove`.
 
@@ -44,7 +47,8 @@ import os
 import sys
 import time
 
-MARKER = "# ai-memory"
+MARKER = "# cairn"
+MARKERS = (MARKER, "# ai-memory")  # the second one: entries written before the rename
 REMOVE_KEY = "floorRemove"
 
 
@@ -63,18 +67,20 @@ def load(path):
 
 def is_managed(entry):
     # Claude Code: {"matcher": ..., "hooks": [{"command": ...}]}
-    if any(MARKER in (h.get("command") or "") for h in entry.get("hooks", []) if isinstance(h, dict)):
+    if any(m in (h.get("command") or "") for m in MARKERS for h in entry.get("hooks", []) if isinstance(h, dict)):
         return True
     # Copilot CLI: flat {"type": "command", "bash": ...} or {"exec": ..., "args": [...]}
     texts = [entry.get(k) or "" for k in ("bash", "powershell", "command")]
     texts += [a for a in entry.get("args", []) if isinstance(a, str)]
-    return any(MARKER in t for t in texts)
+    return any(m in t for m in MARKERS for t in texts)
 
 
 def merge(target, template, replace_keys=False):
     out = json.loads(json.dumps(target))  # deep copy
     for key, value in template.items():
-        if replace_keys:
+        if replace_keys and value is None:
+            out.pop(key, None)  # e.g. the pre-rename "ai-memory" key in agy's hooks.json
+        elif replace_keys:
             out[key] = value
         elif key == "hooks" and isinstance(value, dict):
             hooks = out.get("hooks") if isinstance(out.get("hooks"), dict) else {}
@@ -214,7 +220,8 @@ def main(argv):
         floor_path, prefs_path, target_path, root = args
     else:
         sys.exit(__doc__)
-    subs = {"{{AI_MEMORY_ROOT}}": root, "{{AI_MEMORY_DATA}}": data or root, "{{HOME}}": os.path.expanduser("~")}
+    subs = {"{{CAIRN_ROOT}}": root, "{{CAIRN_DATA}}": data or root, "{{HOME}}": os.path.expanduser("~"),
+            "{{AI_MEMORY_ROOT}}": root, "{{AI_MEMORY_DATA}}": data or root}  # pre-rename placeholders
 
     floor = read_template(floor_path, subs)
     target = load(target_path)

@@ -3,7 +3,7 @@
     "PreToolUse": [
       {
         "type": "command",
-        "bash": "python3 -I \"{{AI_MEMORY_ROOT}}/tools/guard-bash.py\" --out copilot # ai-memory",
+        "bash": "python3 -I \"{{CAIRN_ROOT}}/tools/guard-bash.py\" --out copilot # cairn",
         "timeoutSec": 5
       }
     ]

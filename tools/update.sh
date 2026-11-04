@@ -2,8 +2,8 @@
 # Updates this tool to the latest release (git tag vX.Y.Z) and re-runs install.sh so client hooks,
 # settings and skills match the new version. The memory repository is never committed to: pending
 # layout migrations (migrations/NNN-*.sh) only run after asking, and their changes stay unstaged.
-# What moves is the installed copy (install.sh's worktree, $AI_MEMORY_INSTALL_DIR or
-# ~/.local/share/ai-memory) when there is one; otherwise the clone it is run from.
+# What moves is the installed copy (install.sh's worktree, $CAIRN_INSTALL_DIR or
+# ~/.local/share/cairn) when there is one; otherwise the clone it is run from.
 #
 # Usage: update.sh [--check] [--to vX.Y.Z] [--channel release|main] [--yes] [--dry-run]
 #   --check            only report whether an update exists (used by doctor.sh); never changes anything
@@ -44,7 +44,7 @@ g() { git -C "$ROOT" "$@"; }
 
 # --- phase 2: runs from the freshly checked-out version --------------------------------------------
 if [ "$POST" -eq 1 ]; then
-  say "ai-memory $(ai_memory_version) at $ROOT"
+  say "cairn $(cairn_version) at $ROOT"
   if data_is_separate && [ -d "$DATA" ]; then
     layout="$(data_layout)"
     if [ "$layout" -gt "$DATA_LAYOUT_SUPPORTED" ]; then
@@ -87,7 +87,7 @@ fi
 current="$(g describe --tags --exact-match HEAD 2>/dev/null || g rev-parse --short HEAD)"
 head_sha="$(g rev-parse HEAD)"; target_sha="$(g rev-parse "$target^{commit}")"
 if [ "$head_sha" = "$target_sha" ]; then
-  say "ai-memory is up to date ($current, version $(ai_memory_version))"
+  say "cairn is up to date ($current, version $(cairn_version))"
   exit 0
 fi
 if [ "$CHECK" -eq 1 ]; then
@@ -107,7 +107,7 @@ if [ -n "$branch" ] && [ -n "$(g rev-list "origin/main..HEAD" 2>/dev/null | head
   exit 1
 fi
 
-say "ai-memory: $current -> $target"
+say "cairn: $current -> $target"
 if g merge-base --is-ancestor HEAD "$target_sha"; then
   g log --oneline --no-decorate "HEAD..$target_sha" | head -30 | sed 's/^/  /'
 else

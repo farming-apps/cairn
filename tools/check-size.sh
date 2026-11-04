@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Warns when a memory file exceeds its token budget.
-# Estimate: AI_MEMORY_CHARS_PER_TOKEN characters per token (4 by default). Deliberately
+# Estimate: CAIRN_CHARS_PER_TOKEN characters per token (4 by default). Deliberately
 # approximate: the goal is to keep memory from growing without bound, not an exact count.
 #
 # Usage:
@@ -12,7 +12,7 @@
 set -euo pipefail
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-RATIO="${AI_MEMORY_CHARS_PER_TOKEN:-4}"
+RATIO="${CAIRN_CHARS_PER_TOKEN:-4}"
 
 limit_for() { # token budget per memory file; 0 = no limit (tool docs, templates, third-party skills)
   case "$1" in

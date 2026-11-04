@@ -1,5 +1,5 @@
-# gitleaks rules for ai-memory: the defaults plus PII and paths that must not leave the machine.
-title = "ai-memory"
+# gitleaks rules for cairn: the defaults plus PII and paths that must not leave the machine.
+title = "cairn"
 
 [extend]
 useDefault = true

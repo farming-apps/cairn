@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Claude Code status line. Reads the session JSON from stdin and prints two lines:
-#   [Fable] ai-memory  main*  effort:high  agent:x
-#   [███████░░░] 70% 140k/200k  $0.42 12m  5h 23% 7d 41%  mem: ai-memory · 2 pending · 1 plan · state 16d
+#   [Fable] cairn  main*  effort:high  agent:x
+#   [███████░░░] 70% 140k/200k  $0.42 12m  5h 23% 7d 41%  mem: cairn · 2 pending · 1 plan · state 16d
 # Context colors: green <70 %, amber >=70 %, red >=85 % (adds "⚠ compact").
 # Fields missing from the JSON (cost, limits, agent...) are omitted; it never fails.
 # Also serves Antigravity CLI (agy): its JSON is almost the same; only

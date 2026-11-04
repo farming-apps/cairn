@@ -1,5 +1,5 @@
 # Second barrier, on the remote: catches what slipped past the local hook (e.g. with --no-verify).
-# sanitize.py and check-size.sh live in the ai-memory tool repository; the local hook runs them.
+# sanitize.py and check-size.sh live in the cairn tool repository; the local hook runs them.
 name: scan
 
 on:

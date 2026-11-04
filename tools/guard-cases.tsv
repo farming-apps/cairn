@@ -2,7 +2,7 @@
 # --- everyday commands that must stay silent
 none	ls -la
 none	git status
-none	cat ~/.config/ai-memory/env
+none	cat ~/.config/cairn/env
 none	git push
 none	npm test
 none	npx tsc
@@ -61,7 +61,7 @@ deny	sudo rm -rf /opt/x
 deny	cat ~/.ssh/id_rsa
 deny	cat ~/.git-credentials
 deny	echo {} > ~/.claude/settings.json
-deny	echo AI_MEMORY_PROJECTS_DATA=/x > ~/.config/ai-memory/env
+deny	echo CAIRN_DATA=/x > ~/.config/cairn/env
 deny	sed -i '' 's/a/b/' ~/.config/git-projects/projects.yml
 deny	tee /etc/hosts < x
 deny	git config core.fsmonitor /tmp/x.sh
@@ -116,10 +116,10 @@ deny	tee ~/Library/Application\ Support/Code/User/mcp.json < x
 ask	tee .mcp.json < x
 none	cat ~/.copilot/mcp-config.json
 # --- policy floor (policy/) and client preferences (<data>/settings/): write = deny, read = none
-deny	sed -i s/deny/allow/ ~/ai-memory-data/settings/claude/settings.json
-deny	echo {} > /srv/ai-memory/policy/copilot/settings.json
+deny	sed -i s/deny/allow/ ~/cairn-data/settings/claude/settings.json
+deny	echo {} > /srv/cairn/policy/copilot/settings.json
 deny	cp x.json templates/data/settings/agy/settings.json
-none	cat ~/ai-memory-data/settings/claude/settings.json
+none	cat ~/cairn-data/settings/claude/settings.json
 none	cat policy/vscode/settings.json
 # --- shell env files (.envrc anywhere, .zshenv): deny on read and on write
 deny	cat ~/.zshenv
@@ -130,3 +130,6 @@ deny	echo export X=1 > .envrc
 deny	cp /tmp/x ~/work/app/.envrc
 deny	sed -i s/a/b/ .envrc
 none	cat ~/.zshrc
+# --- pre-rename machine config (~/.config/ai-memory) stays protected until every machine migrates
+deny	echo x > ~/.config/ai-memory/env
+none	cat ~/.config/ai-memory/env

@@ -53,8 +53,9 @@
       "Edit(~/.gemini/antigravity-cli/settings.json)",
       "Edit(~/.gemini/config/hooks.json)",
       "Edit(~/.gemini/GEMINI.md)",
-      "Edit(/{{AI_MEMORY_ROOT}}/policy/**)",
-      "Edit(/{{AI_MEMORY_DATA}}/settings/**)",
+      "Edit(/{{CAIRN_ROOT}}/policy/**)",
+      "Edit(/{{CAIRN_DATA}}/settings/**)",
+      "Edit(~/.config/cairn/**)",
       "Edit(~/.config/ai-memory/**)",
       "Edit(~/.config/git-projects/**)",
       "Edit(~/.ssh/**)",
@@ -97,7 +98,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -I \"{{AI_MEMORY_ROOT}}/tools/guard-bash.py\" # ai-memory",
+            "command": "python3 -I \"{{CAIRN_ROOT}}/tools/guard-bash.py\" # cairn",
             "timeout": 5,
             "onFailure": "block",
             "statusMessage": "guard-bash"

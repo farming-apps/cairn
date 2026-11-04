@@ -7,8 +7,8 @@ Goal: both repositories can be cloned on any machine without anything sensitive 
 | What | Where | Travels |
 |------|-------|---------|
 | Scripts, policies, hooks, templates | this repo (the tool; may be public) | yes, with `git clone` |
-| Rules, conventions, architecture with aliases, project memory | the memory repo (`AI_MEMORY_PROJECTS_DATA`, private git) | yes, with `git clone` |
-| Machine paths, endpoints, forbidden terms, private profile | `~/.config/ai-memory/` and `<data>/global/profile.private.md` (ignored) | no; copied by hand over an encrypted channel |
+| Rules, conventions, architecture with aliases, project memory | the memory repo (`CAIRN_DATA`, private git) | yes, with `git clone` |
+| Machine paths, endpoints, forbidden terms, private profile | `~/.config/cairn/` and `<data>/global/profile.private.md` (ignored) | no; copied by hand over an encrypted channel |
 | Keys, tokens, passwords | Keychain or password manager; exported as environment variables | never |
 
 Golden rule: **the repo names variables, never their values.** `ANTHROPIC_API_KEY` yes; its content no.
@@ -40,7 +40,7 @@ ban on the model editing the policy files: each client is
 denied editing its own **and the other's** (`~/.claude/settings.json`, `~/.claude/CLAUDE.md`,
 `~/.gemini/antigravity-cli/settings.json`, `~/.gemini/config/hooks.json`, `~/.gemini/GEMINI.md`),
 so neither can remove its own rules or its neighbour's. The same deny covers the machine config of
-ai-memory itself (`~/.config/ai-memory/`: `env`, `projects.yml`, `forbidden-terms.txt`) and the
+cairn itself (`~/.config/cairn/`: `env`, `projects.yml`, `forbidden-terms.txt`) and the
 `git-projects` registry: the tools read them, only you write them. If a session needs something the
 policy blocks, you do it by hand in the terminal: that is the point.
 

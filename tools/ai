@@ -3,7 +3,7 @@
 
 Loads <data>/build/<project>/AGENTS.md as the system prompt (builds the bundle if missing) and
 sends your question. Works with Ollama, LM Studio, LiteLLM or any /v1/chat/completions server.
-<data> is the memory repo: $AI_MEMORY_PROJECTS_DATA, ~/.config/ai-memory/env, or this repo (see tools/lib.sh).
+<data> is the memory repo: $CAIRN_DATA, ~/.config/cairn/env, or this repo (see tools/lib.sh).
 
 Usage:
   ai "question"                 detects the project from the current repo name
@@ -26,16 +26,21 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def data_dir():
-    """Memory repo: $AI_MEMORY_PROJECTS_DATA, else the AI_MEMORY_PROJECTS_DATA line in ~/.config/ai-memory/env, else ROOT.
+    """Memory repo: $CAIRN_DATA, else the CAIRN_DATA line in ~/.config/cairn/env, else ROOT.
     Mirrors tools/lib.sh."""
-    value = os.environ.get("AI_MEMORY_PROJECTS_DATA", "")
+    # AI_MEMORY_* and ~/.config/ai-memory are the pre-rename names, still read while machines migrate.
+    value = os.environ.get("CAIRN_DATA") or os.environ.get("AI_MEMORY_PROJECTS_DATA", "")
     if not value:
-        local_dir = os.path.expanduser(os.environ.get("AI_MEMORY_LOCAL") or "~/.config/ai-memory")
-        env_file = os.path.join(local_dir, "env")
+        local = os.environ.get("CAIRN_LOCAL") or os.environ.get("AI_MEMORY_LOCAL")
+        if not local:
+            local = "~/.config/cairn"
+            if not os.path.isdir(os.path.expanduser(local)) and os.path.isdir(os.path.expanduser("~/.config/ai-memory")):
+                local = "~/.config/ai-memory"
+        env_file = os.path.join(os.path.expanduser(local), "env")
         if os.path.isfile(env_file):
             with open(env_file, encoding="utf-8") as fh:
                 for line in fh:
-                    if line.startswith("AI_MEMORY_PROJECTS_DATA="):
+                    if line.startswith(("CAIRN_DATA=", "AI_MEMORY_PROJECTS_DATA=")):
                         value = line.split("=", 1)[1].strip().strip('"')
     return os.path.realpath(os.path.expanduser(value)) if value else ROOT
 

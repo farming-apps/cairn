@@ -9,7 +9,8 @@
   `toolCall.args.Cwd` or `workspacePaths`):
     - {"decision": "ask"|"deny", "reason": ...}
     - no opinion -> {"decision": NEUTRAL}. agy treats `{}` as a denial, so an explicit value
-      is required; NEUTRAL comes from $AI_MEMORY_GUARD_NEUTRAL (default "ask", which honors
+      is required; NEUTRAL comes from $CAIRN_GUARD_NEUTRAL (or the pre-rename
+      $AI_MEMORY_GUARD_NEUTRAL; default "ask", which honors
       allow rules and the user's "Always Allow" cache).
 
   GitHub Copilot CLI (PreToolUse hook, PascalCase event: same input as Claude Code, with the
@@ -126,8 +127,8 @@ POLICY_RX = re.compile(
     r"|~/\.gemini/(GEMINI\.md|AGENTS\.md|config/hooks\.json|config/mcp_config\.json|antigravity-cli/settings\.json)"
     r"|~/\.copilot/(hooks(/.*)?|permissions-config\.json|settings\.json|mcp-config\.json)"
     r"|~/Library/Application Support/Code/User/mcp\.json|~/\.config/Code/User/mcp\.json"   # MCP servers run commands
-    r"|~/\.config/(ai-memory|git-projects)(/.*)?"   # ai-memory machine config (env, registry, forbidden terms): edited by hand only
-    r"|(.*/)?(policy|settings)/(claude|agy|copilot|vscode)(/.*)?"   # ai-memory policy floor and the user's client preferences
+    r"|~/\.config/(cairn|ai-memory|git-projects)(/.*)?"   # cairn machine config (env, registry, forbidden terms; ai-memory = pre-rename): edited by hand only
+    r"|(.*/)?(policy|settings)/(claude|agy|copilot|vscode)(/.*)?"   # cairn policy floor and the user's client preferences
     r"|(.*/)?guard-bash\.py)$", re.I)
 AGENT_RX = re.compile(
     r"^(~/\.(claude|gemini|copilot|codex)(/.*)?|(.*/)?\.(claude|cursor|vscode|gemini|agents|codex|windsurf|continue"
@@ -264,7 +265,7 @@ PATTERNS = [
 def neutral(fmt):
     """'No opinion' response. Claude Code and Copilot: nothing. agy: explicit decision (see docstring)."""
     if fmt == "agy":
-        print(json.dumps({"decision": os.environ.get("AI_MEMORY_GUARD_NEUTRAL", "ask")}))
+        print(json.dumps({"decision": os.environ.get("CAIRN_GUARD_NEUTRAL") or os.environ.get("AI_MEMORY_GUARD_NEUTRAL", "ask")}))
     sys.exit(0)
 
 

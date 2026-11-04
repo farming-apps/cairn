@@ -14,7 +14,7 @@ Exceptions:
   - a line containing the marker  sanitize:allow  is skipped
   - files in EXCLUDED_PATHS contain patterns on purpose and are skipped
   - forbidden terms (client names, internal domains): one term per line in
-    $AI_MEMORY_LOCAL/forbidden-terms.txt (default ~/.config/ai-memory). That list is
+    $CAIRN_LOCAL/forbidden-terms.txt (default ~/.config/cairn). That list is
     sensitive: it lives outside the repository.
 
 Standard library only (Python 3.9+). detect-secrets or gitleaks remain the main barrier in
@@ -78,7 +78,12 @@ def mask(s):
 
 
 def load_forbidden_terms():
-    base = os.environ.get("AI_MEMORY_LOCAL") or os.path.join(os.path.expanduser("~"), ".config", "ai-memory")
+    base = os.environ.get("CAIRN_LOCAL") or os.environ.get("AI_MEMORY_LOCAL")  # AI_MEMORY_*: pre-rename name
+    if not base:
+        base = os.path.join(os.path.expanduser("~"), ".config", "cairn")
+        old = os.path.join(os.path.expanduser("~"), ".config", "ai-memory")
+        if not os.path.isdir(base) and os.path.isdir(old):
+            base = old
     path = os.path.join(os.path.expanduser(base), "forbidden-terms.txt")
     terms = []
     if os.path.isfile(path):

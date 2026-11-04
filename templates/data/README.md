@@ -1,6 +1,6 @@
-# ai-memory data
+# cairn data
 
-Private memory read by the AI clients on every machine. Managed with the `ai-memory` tool
+Private memory read by the AI clients on every machine. Managed with the `cairn` tool
 (`tools/install.sh --data <this path>`), which links it into Claude Code, Antigravity CLI and
 GitHub Copilot CLI and installs the pre-commit barrier (gitleaks + sanitize + size).
 

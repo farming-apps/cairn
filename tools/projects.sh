@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tracks and syncs projects across arbitrary sections defined in an external YAML file.
-# Default file: $AI_MEMORY_PROJECTS or $AI_MEMORY_LOCAL/projects.yml (~/.config/ai-memory/projects.yml).
-# Default encrypted backup path: $AI_MEMORY_PROJECTS_ENC (or passed as argument).
+# Default file: $CAIRN_PROJECTS or $CAIRN_LOCAL/projects.yml (~/.config/cairn/projects.yml).
+# Default encrypted backup path: $CAIRN_PROJECTS_ENC (or passed as argument).
 #
 # Usage:
 #   projects.sh [list] [--section <sec>] [--status <st>] [--file <yml>]
@@ -12,8 +12,8 @@
 set -euo pipefail
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-PROJECTS_FILE="${AI_MEMORY_PROJECTS:-$LOCAL_DIR/projects.yml}"
-ENC_FILE="${AI_MEMORY_PROJECTS_ENC:-}"
+PROJECTS_FILE="${CAIRN_PROJECTS:-$LOCAL_DIR/projects.yml}"
+ENC_FILE="${CAIRN_PROJECTS_ENC:-}"
 
 cmd="list"
 section=""
@@ -95,7 +95,7 @@ for sec, projs in raw_data.items():
         p = str(cfg.get("path", "")).strip()
         p_exp = os.path.expanduser(p) if p else ""
         agents = "1" if str(cfg.get("agents", "")).lower() in ("true", "1", "yes") else "0"
-        # memory: false -> registered repo without ai-memory bridges or project memory (default true)
+        # memory: false -> registered repo without cairn bridges or project memory (default true)
         memory = "0" if str(cfg.get("memory", "true")).lower() in ("false", "0", "no") else "1"
         # kind: workspace -> a plain folder holding several repos; one memory for the whole folder
         kind = "workspace" if str(cfg.get("kind", "")).strip().lower() == "workspace" else "repo"
@@ -107,7 +107,7 @@ PY
 case "$cmd" in
   list)
     if [ ! -f "$PROJECTS_FILE" ]; then
-      echo "projects: $PROJECTS_FILE does not exist (run tools/install.sh or set AI_MEMORY_PROJECTS)" >&2
+      echo "projects: $PROJECTS_FILE does not exist (run tools/install.sh or set CAIRN_PROJECTS)" >&2
       exit 1
     fi
     printf '%-12s %-18s %-9s %-12s %-8s %s\n' "SECTION" "PROJECT" "STATUS" "REPO" "MEMORY" "PATH / NOTES"
@@ -180,7 +180,7 @@ case "$cmd" in
 
   encrypt)
     dest="${pos_arg:-$ENC_FILE}"
-    [ -n "$dest" ] || { echo "usage: projects.sh encrypt <dest-file> (or set AI_MEMORY_PROJECTS_ENC)" >&2; exit 2; }
+    [ -n "$dest" ] || { echo "usage: projects.sh encrypt <dest-file> (or set CAIRN_PROJECTS_ENC)" >&2; exit 2; }
     dest="${dest/#\~/$HOME}"
     [ -f "$PROJECTS_FILE" ] || { echo "projects: source $PROJECTS_FILE does not exist" >&2; exit 1; }
     mkdir -p "$(dirname "$dest")"
@@ -204,7 +204,7 @@ case "$cmd" in
 
   decrypt)
     src="${pos_arg:-$ENC_FILE}"
-    [ -n "$src" ] || { echo "usage: projects.sh decrypt <src-file> (or set AI_MEMORY_PROJECTS_ENC)" >&2; exit 2; }
+    [ -n "$src" ] || { echo "usage: projects.sh decrypt <src-file> (or set CAIRN_PROJECTS_ENC)" >&2; exit 2; }
     src="${src/#\~/$HOME}"
     [ -f "$src" ] || { echo "projects: encrypted file $src does not exist" >&2; exit 1; }
     mkdir -p "$(dirname "$PROJECTS_FILE")"

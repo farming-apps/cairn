@@ -16,7 +16,7 @@ on each machine with `tools/merge-settings.py`.
 | VS Code | `vscode/settings.json` | `settings/vscode/settings.json` | `~/Library/Application Support/Code/User/settings.json` (macOS) or `~/.config/Code/User/settings.json`; override with `$VSCODE_USER_DIR` |
 
 ## Floor, preferences and machine
-- **Floor** (this directory): `permissions.deny`, `permissions.ask`, `hooks` marked `# ai-memory`,
+- **Floor** (this directory): `permissions.deny`, `permissions.ask`, `hooks` marked `# cairn`,
   Copilot's `sandbox` and VS Code's `github.copilot.enable`/`files.associations`.
 - **Preferences** (`<data>/settings/`): by default `permissions.defaultMode` (every session starts in
   plan mode), `statusLine` (`tools/statusline.sh`) and `attribution` (empty `commit`/`pr` and
@@ -41,7 +41,7 @@ on each machine with `tools/merge-settings.py`.
   touched; the repo's language rule lives in the profile's working-language field
   (`global/profile.private.md`) instead.
 
-`{{AI_MEMORY_ROOT}}` (tool repo), `{{AI_MEMORY_DATA}}` (memory repo) and `{{HOME}}` are replaced with
+`{{CAIRN_ROOT}}` (tool repo), `{{CAIRN_DATA}}` (memory repo) and `{{HOME}}` are replaced with
 real paths at install time; this way the files contain no home paths and pass the gitleaks hook.
 
 ## Why preferences cannot loosen the policy
@@ -73,7 +73,7 @@ The memory repo is where models write (`memory/`, `plans/`), so it must not be a
      credential files → deny; shell env files (`.envrc` anywhere, `.zshenv`) → deny on read and
      write, in every client (Claude `Read`/`Edit`, agy `read_file`/`write_file`, the guard for the
      shell of all three CLIs, VS Code Copilot off for `.zshenv`; `.envrc` is already `.env*`); the agent's own policy, `guard-bash.py`, `policy/<client>/`,
-     `<data>/settings/<client>/` and the ai-memory machine config (`~/.config/ai-memory/`, `~/.config/git-projects/`) → deny on write; other
+     `<data>/settings/<client>/` and the cairn machine config (`~/.config/cairn/`, `~/.config/git-projects/`) → deny on write; other
      agents' config, shell rc files, LaunchAgents, git hooks, CI workflows → ask on write.
    - **git as a hook**: `git config`/`-c` on a callback key (`core.fsmonitor`, `core.hooksPath`,
      `credential.helper`, …) → ask, or deny if the value is an inline command; `git worktree add ./.git`,
@@ -95,8 +95,8 @@ The memory repo is where models write (`memory/`, `plans/`), so it must not be a
 (it only needs `jq`). Two lines:
 
 ```
-[Fable] ai-memory  main*  effort:high
-[███████░░░] 70% 140k/200k  $0.42 12m  5h 23% 7d 41%  mem: ai-memory · 2 pending · 1 plan · state 16d
+[Fable] cairn  main*  effort:high
+[███████░░░] 70% 140k/200k  $0.42 12m  5h 23% 7d 41%  mem: cairn · 2 pending · 1 plan · state 16d
 ```
 - Line 1: model, current folder (last component only), branch (`*` if there are uncommitted
   changes), effort level and agent if you are inside a subagent.
@@ -118,8 +118,8 @@ differs in the payload: its `used_percentage`/`context_window_size` are null and
 shown as `7 premium`; and it sends no rate limits, effort or agent. Example under Copilot:
 
 ```
-[Claude Sonnet 4.5] ai-memory  main*
-[█████░░░░░] 50% 64k/128k  7 premium 10m  mem: ai-memory · 2 pending
+[Claude Sonnet 4.5] cairn  main*
+[█████░░░░░] 50% 64k/128k  7 premium 10m  mem: cairn · 2 pending
 ```
 
 ## Testing
@@ -159,7 +159,7 @@ when the `copilot` binary is present. Three keys:
   PascalCase event name selects the Claude-compatible payload (`tool_name: "Bash"`, `tool_input`,
   `cwd`); the reply differs, so the guard prints a flat `{"permissionDecision", "permissionDecisionReason"}`
   instead of Claude's `hookSpecificOutput` wrapper, which is what `--out copilot` selects. Entries are
-  recognised as managed by the `# ai-memory` marker in `bash`, like Claude's `command`.
+  recognised as managed by the `# cairn` marker in `bash`, like Claude's `command`.
 - **`sandbox.enabled: true`** → command sandboxing on. Every shell command Copilot runs is launched
   inside an OS sandbox (Seatbelt via `sandbox-exec` on macOS, bubblewrap on Linux, through Microsoft's
   MXC library). Without it, commands run with your full user access: anything you can read, write,
@@ -206,7 +206,7 @@ It is the "Gemini" of this setup (the `agy` binary; Gemini CLI is not installed)
   `read_file(...)`, `write_file(...)` rules: token prefix, each part of an `&&`/`;`/`|` chain is
   evaluated separately, and `regex:` nests a regex per token. Deny > Ask > Allow. `{{HOME}}` is
   replaced at install time.
-- **Hook** → `agy/hooks.json`, merged into `~/.gemini/config/hooks.json` as the `ai-memory` key
+- **Hook** → `agy/hooks.json`, merged into `~/.gemini/config/hooks.json` as the `cairn` key
   (other keys, e.g. `cmux`, are left alone). agy does not load hooks placed inside `settings.json`.
   The same `tools/guard-bash.py` detects the agy format (`toolCall.args.CommandLine`) and
   replies `{"decision": "deny"|"ask", "reason"}`; with no opinion it replies `{}`.
@@ -215,7 +215,7 @@ It is the "Gemini" of this setup (the `agy` binary; Gemini CLI is not installed)
   `global/GEMINI.md` says `@[AGENTS](AGENTS.md)` and the `AGENTS.md` files carry no nested imports:
   each wrapper imports `AGENTS.md` and `state.md` in its own syntax.
 - **Neutral hook reply**: agy treats `{}` as a denial (tested), so with no opinion the guard
-  replies `{"decision": "ask"}` (configurable with `AI_MEMORY_GUARD_NEUTRAL`). `ask` respects
+  replies `{"decision": "ask"}` (configurable with `CAIRN_GUARD_NEUTRAL`). `ask` respects
   your `allow` rules and the "Always Allow" cache.
 - **Status line** → the same `tools/statusline.sh` as Claude Code, declared in
   `<data>/settings/agy/settings.json` (`statusLine`). The agy JSON differs only in `cost.total_usd` and

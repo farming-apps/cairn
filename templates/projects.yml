@@ -1,17 +1,17 @@
 # Project registry grouped by arbitrary sections (e.g. section1, section2, section3).
-# THIS FILE IS A TEMPLATE. install.sh copies it to ~/.config/ai-memory/projects.yml
-# (outside the repository), or override the location with $AI_MEMORY_PROJECTS.
+# THIS FILE IS A TEMPLATE. install.sh copies it to ~/.config/cairn/projects.yml
+# (outside the repository), or override the location with $CAIRN_PROJECTS.
 # To back it up elsewhere encrypted: tools/projects.sh encrypt <path/projects.yml.age>
 #
 # Fields per project:
 #   path:    local repository path (~ is expanded)
 #   status:  active (default) | paused | archived
 #   agents:  true | false (optional; passes --agents to tools/new-project.sh)
-#   memory:  true (default) | false (registered, but no ai-memory bridges or project memory)
+#   memory:  true (default) | false (registered, but no cairn bridges or project memory)
 #   kind:    repo (default) | workspace (a plain folder holding several repos; one memory for all)
 #   notes:   short description (optional)
 # Other keys (e.g. remote: for a clone script in your dotfiles) are ignored, so one manifest can
-# serve both repos: point $AI_MEMORY_PROJECTS at it.
+# serve both repos: point $CAIRN_PROJECTS at it.
 
 section1:
   # project-a:
