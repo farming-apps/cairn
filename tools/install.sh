@@ -326,8 +326,9 @@ if has_module hardening; then
   fi
   copy_if_absent "$ROOT/templates/forbidden-terms.txt" "$LOCAL_DIR/forbidden-terms.txt"
 
-  # Policy = floor (policy/, shipped with the tool, never weakened) + the user's preferences
-  # (<data>/settings/, can only add). Uncommitted preference changes are shown and need a yes:
+  # Policy = floor (policy/, shipped with the tool) + the user's preferences (<data>/settings/:
+  # they add, and drop floor rules only explicitly via `floorRemove`, printed on every run).
+  # Uncommitted preference changes are shown and need a yes:
   # a model that edited them must not get them applied silently.
   PREFS_OK=1
   if data_is_separate && git -C "$DATA" rev-parse --git-dir >/dev/null 2>&1 \

@@ -5,9 +5,15 @@ Two sources, combined before touching the target:
   FLOOR  ai-memory/policy/<client>/...json: the security baseline shipped with the tool
          (deny/ask rules, guard-bash hooks, sandbox). It can never be weakened.
   PREFS  <data>/settings/<client>/settings.json: the user's preferences (defaultMode, statusLine,
-         attribution, extra deny/ask...). Optional; it can only add to the floor.
+         attribution, extra deny/ask...). Optional; it adds to the floor and can drop floor rules
+         only explicitly, through its `floorRemove` key (see below).
 Combination: lists are united (floor first, extras appended); on any other conflict the floor
 wins; `hooks` come from the floor only (put your own hooks in the client's file directly).
+
+Floor overrides: PREFS may hold `floorRemove`, shaped like the floor. A list removes those items
+from the floor's list; `null` removes that key entirely (also from the target, if it still holds
+the floor's value). `hooks` cannot be removed. Each removal is printed; `floorRemove` itself is
+never written to the target.
 
 Merge into the target (Claude Code, Antigravity CLI, Copilot CLI or VS Code settings.json):
   - keys whose value is a dict (e.g. `permissions`): merged one level deep; the combined subkeys
@@ -26,8 +32,10 @@ the floor (every list item present, every other value equal; `hooks` are checked
 Substitutions in both sources: {{AI_MEMORY_ROOT}} -> tool repo, {{AI_MEMORY_DATA}} -> memory repo
 (--data, default the tool repo), {{HOME}} -> user's home.
 
+--check mode with PREFS: checks against the floor minus PREFS' `floorRemove`.
+
 Usage: merge-settings.py [--dry-run] [--replace-keys] [--data DIR] FLOOR [PREFS] TARGET REPO_ROOT
-       merge-settings.py --check [--data DIR] FLOOR TARGET REPO_ROOT
+       merge-settings.py --check [--data DIR] FLOOR [PREFS] TARGET REPO_ROOT
 Exits 0 if nothing changed, 3 if it did (or would with --dry-run), 1 on error or failed check.
 """
 import difflib
@@ -37,6 +45,7 @@ import sys
 import time
 
 MARKER = "# ai-memory"
+REMOVE_KEY = "floorRemove"
 
 
 def load(path):
@@ -94,6 +103,60 @@ def combine(floor, prefs, path=""):
     return floor
 
 
+def apply_removals(floor, removals):
+    """Floor minus `floorRemove`. Returns (reduced floor, removed descriptions, warnings, dropped).
+
+    dropped holds (key path, floor value) for keys removed with `null`, so they can be dropped
+    from the target too."""
+    removed, warnings, dropped = [], [], []
+
+    def walk(fl, rm, keys):
+        if not isinstance(rm, dict):
+            warnings.append(f"{REMOVE_KEY}{'.' if keys else ''}{'.'.join(keys)} must be an object; ignored")
+            return fl
+        out = dict(fl)
+        for key, spec in rm.items():
+            here = keys + (key,)
+            name = ".".join(here)
+            if not keys and key == "hooks":
+                warnings.append(f"{REMOVE_KEY}.hooks ignored: the guard-bash hooks cannot be removed")
+            elif key not in out:
+                warnings.append(f"{REMOVE_KEY}.{name}: not in the floor; ignored")
+            elif spec is None:
+                dropped.append((here, out.pop(key)))
+                removed.append(f"{name} (whole key)")
+            elif isinstance(spec, list):
+                if not isinstance(out[key], list):
+                    warnings.append(f"{REMOVE_KEY}.{name}: the floor value is not a list; ignored")
+                    continue
+                for item in spec:
+                    if item in out[key]:
+                        removed.append(f"{name} {item!r}")
+                    else:
+                        warnings.append(f"{REMOVE_KEY}.{name}: {item!r} not in the floor; ignored")
+                out[key] = [x for x in out[key] if x not in spec]
+            elif isinstance(spec, dict) and isinstance(out[key], dict):
+                out[key] = walk(out[key], spec, here)
+            else:
+                warnings.append(f"{REMOVE_KEY}.{name}: use a list of items, an object or null; ignored")
+        return out
+
+    reduced = floor if removals is None else walk(floor, removals, ())
+    return reduced, removed, warnings, dropped
+
+
+def drop_keys(target, dropped):
+    """Removes keys dropped from the floor from the target while they still hold the floor's value."""
+    out = json.loads(json.dumps(target))
+    for keys, value in dropped:
+        node = out
+        for k in keys[:-1]:
+            node = node.get(k) if isinstance(node, dict) else None
+        if isinstance(node, dict) and node.get(keys[-1]) == value:
+            del node[keys[-1]]
+    return out
+
+
 def missing_floor(floor, target, path=""):
     """Items of the floor absent from the target (hooks excluded)."""
     if isinstance(floor, dict):
@@ -147,7 +210,7 @@ def main(argv):
     dry, replace_keys, check = "--dry-run" in argv, "--replace-keys" in argv, "--check" in argv
     if len(args) == 3:
         floor_path, prefs_path, target_path, root = args[0], None, args[1], args[2]
-    elif len(args) == 4 and not check:
+    elif len(args) == 4:
         floor_path, prefs_path, target_path, root = args
     else:
         sys.exit(__doc__)
@@ -155,18 +218,23 @@ def main(argv):
 
     floor = read_template(floor_path, subs)
     target = load(target_path)
+    prefs = read_template(prefs_path, subs) if prefs_path and os.path.exists(prefs_path) else {}
+    if not isinstance(prefs, dict):
+        sys.exit(f"merge-settings: {prefs_path} must hold a JSON object")
+    floor, removed, warnings, dropped = apply_removals(floor, prefs.pop(REMOVE_KEY, None))
+    for w in warnings:
+        print(f"  warning: {w} ({prefs_path})")
+    for r in removed:
+        print(f"  floor override: removed {r} ({prefs_path})")
     if check:
         missing = missing_floor(floor, target)
         for m in missing:
             print(f"  missing from {target_path}: {m.lstrip('.')}")
         return 1 if missing else 0
 
-    prefs = read_template(prefs_path, subs) if prefs_path and os.path.exists(prefs_path) else {}
-    if not isinstance(prefs, dict):
-        sys.exit(f"merge-settings: {prefs_path} must hold a JSON object")
     if isinstance(prefs.get("hooks"), dict) and prefs["hooks"]:
         print(f"  warning: {prefs_path} defines hooks; ignored (hooks come from the policy floor only)")
-    merged = merge(target, combine(floor, prefs), replace_keys)
+    merged = merge(drop_keys(target, dropped), combine(floor, prefs), replace_keys)
 
     before, after = dump(target) if target else "", dump(merged)
     if before == after:

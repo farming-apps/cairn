@@ -44,10 +44,13 @@ fail() { printf '  FAIL %s\n' "$*"; fails=$((fails+1)); }
 warn() { printf '  WARN %s\n' "$*"; }
 check_floor() { # client rel-floor target — every rule of policy/<rel> must be in the installed file
   # The installed copy (HOOK_ROOT) is what install.sh applied; fall back to this clone if it has no policy/ yet.
-  local out floor="$HOOK_ROOT/policy/$2"
+  # Rules dropped on purpose with `floorRemove` in <data>/settings/<rel> are not required, only reported.
+  local out floor="$HOOK_ROOT/policy/$2" prefs
   [ -f "$floor" ] || floor="$ROOT/policy/$2"
-  if out="$(python3 -I "$ROOT/tools/merge-settings.py" --check --data "$DATA" "$floor" "$3" "$HOOK_ROOT" 2>&1)"; then
+  prefs="$(data_file "settings/$2")"
+  if out="$(python3 -I "$ROOT/tools/merge-settings.py" --check --data "$DATA" "$floor" "$prefs" "$3" "$HOOK_ROOT" 2>&1)"; then
     ok "$1: policy floor complete (policy/$2)"
+    [ -n "$out" ] && warn "$1: floor overrides active"$'\n'"$out"
   else
     fail "$1: policy floor incomplete; re-run tools/install.sh"$'\n'"$out"
   fi

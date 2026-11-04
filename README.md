@@ -20,7 +20,7 @@ templates/data/    skeleton of the memory repo (copied by install.sh --data):
   prompts/           reusable prompts
   presets/           which model for which task, no keys
   mcp/servers.json   MCP server catalog, rendered into every installed client (no secret values)
-  settings/<client>/ your client preferences (defaultMode, statusLine, attribution, extra deny/ask)
+  settings/<client>/ your client preferences (defaultMode, statusLine, attribution, extra deny/ask, floorRemove)
   gateway/           LiteLLM config for phase 2 (os.environ/... only)
 templates/         templates for local machine files (forbidden-terms.txt, projects.yml)
 policy/claude/     Claude Code security floor: deny/ask permissions + guard-bash hook
@@ -132,8 +132,9 @@ If you move this repo, update that variable and re-run `install.sh`: client hook
 `settings.json`; and what must always ask: `sudo`, `git push --force`, `git reset --hard`,
 `git clean`. The prefix rules are reinforced by the `tools/guard-bash.py` hook, which analyses each
 command (`rm -fr`, `rm -r -f`, `sh -c "rm -rf …"`, empty variables, `find -delete`, `curl | sh`).
-Your memory repo's `settings/` can add rules and preferences but never remove floor rules, and
-models cannot edit either directory. Details, rationale and how to change it in [policy/README.md](policy/README.md).
+Your memory repo's `settings/` is where you edit it: it adds rules and preferences, and removes
+floor rules only explicitly through a `floorRemove` key (reported by `install.sh` and `doctor.sh`).
+Models cannot edit either directory. Details, rationale and how to change it in [policy/README.md](policy/README.md).
 
 ## MCP servers
 One catalog, `<data>/mcp/servers.json`, describes the MCP servers you want everywhere; `install.sh
