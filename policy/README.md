@@ -1,7 +1,8 @@
 # policy/
 
 The **security floor** for the AI clients: deny/ask permissions, the guard-bash hooks and the
-Copilot sandbox. It ships with the tool and cannot be weakened from the memory repo. Your own
+Copilot sandbox. It ships with the tool as the base config; everything you edit lives in the memory
+repo, which can only weaken the floor explicitly (`floorRemove`, below). Your own
 preferences live in the memory repo, `<data>/settings/<client>/settings.json` (defaults in
 `templates/data/settings/`). `install.sh` combines both and merges the result into the real files
 on each machine with `tools/merge-settings.py`.
@@ -22,8 +23,18 @@ on each machine with `tools/merge-settings.py`.
   `sessionUrl: false`: no `Co-Authored-By` or "Generated with" lines in commits and PRs; the same rule
   for every client is in `global/AGENTS.md`). You may add any other key, and extra `deny`/`ask` rules.
 - **Combination**: lists are united (floor first, your extras after); on any other conflict the floor
-  wins; `hooks` come from the floor only. Removing a floor rule from your preferences changes nothing.
+  wins; `hooks` come from the floor only. Leaving a floor rule out of your preferences changes nothing.
   Each `install.sh` replaces the combined keys in the machine file.
+- **Floor overrides** (`floorRemove` in `<data>/settings/<client>/settings.json`): the only way to drop
+  a floor rule, shaped like the floor. A list removes those items; `null` removes the whole key (also
+  from the machine file). `hooks` cannot be removed; unknown items are warned about and ignored.
+  `install.sh` prints each removal and `doctor.sh` reports them as `WARN` without failing.
+  ```json
+  "floorRemove": {
+    "permissions": { "ask": ["Bash(git clean:*)"] },
+    "sandbox": null
+  }
+  ```
 - **Machine** (preserved): `model`, `theme`, `tui`, `permissions.allow` (what you accept with
   "always allow"), your own unmarked hooks, and any other key.
 - Claude Code's own `language` key in `~/.claude/settings.json` is a machine-level setting never
@@ -35,7 +46,8 @@ real paths at install time; this way the files contain no home paths and pass th
 
 ## Why preferences cannot loosen the policy
 The memory repo is where models write (`memory/`, `plans/`), so it must not be able to relax the next install:
-1. **Floor + extras**: the security rules are not in the memory repo at all; preferences can only add.
+1. **Floor + extras**: the security rules are not in the memory repo; preferences add, and remove
+   only what `floorRemove` names explicitly, logged on every install and doctor run.
 2. **Write ban**: the floor denies editing `policy/` and `<data>/settings/` (Claude `Edit(//…)`, agy
    `write_file(…)`), and `guard-bash.py` denies writing `policy/<client>/` and `settings/<client>/` from
    the shell. Edit your preferences by hand.
@@ -58,7 +70,9 @@ The memory repo is where models write (`memory/`, `plans/`), so it must not be a
      `… | curl`, DNS lookups with a computed argument, the macOS Keychain → deny; remote package
      runners (`npx -y`, `uvx`), uploads, tunnels, `ssh host "cmd"`, metadata endpoints → ask.
    - **Sensitive paths** (mirrors the `Read`/`Edit` rules so `cat`/`>` cannot bypass them):
-     credential files → deny; the agent's own policy, `guard-bash.py`, `policy/<client>/`,
+     credential files → deny; shell env files (`.envrc` anywhere, `.zshenv`) → deny on read and
+     write, in every client (Claude `Read`/`Edit`, agy `read_file`/`write_file`, the guard for the
+     shell of all three CLIs, VS Code Copilot off for `.zshenv`; `.envrc` is already `.env*`); the agent's own policy, `guard-bash.py`, `policy/<client>/`,
      `<data>/settings/<client>/` and the ai-memory machine config (`~/.config/ai-memory/`, `~/.config/git-projects/`) → deny on write; other
      agents' config, shell rc files, LaunchAgents, git hooks, CI workflows → ask on write.
    - **git as a hook**: `git config`/`-c` on a callback key (`core.fsmonitor`, `core.hooksPath`,
@@ -74,7 +88,7 @@ The memory repo is where models write (`memory/`, `plans/`), so it must not be a
    With `onFailure: block`: if the script does not exist (repo moved), Bash stays blocked until
    you re-run `install.sh`. This is intentional.
 3. `Edit(~/.claude/settings.json)` denied: the model cannot remove its own rules.
-   To change the policy, edit `policy/` (floor) or `<data>/settings/` (preferences) by hand and re-run `install.sh`.
+   To change the policy, edit `<data>/settings/` by hand (preferences, extra rules, `floorRemove`) and re-run `install.sh`.
 
 ## Status line
 `statusLine` runs `tools/statusline.sh` with the session JSON Claude Code sends on stdin
@@ -160,7 +174,7 @@ when the `copilot` binary is present. Three keys:
   the command runs. Expect legitimate commands that leave the repo (installing into the home, writing
   `~/.config`) to fail; Copilot offers a per-command bypass prompt, and `/sandbox disable` turns it off
   for the current session only. Because the key is part of the floor, `install.sh` re-enables it and
-  `doctor.sh` fails without it; to opt out on one machine, remove `sandbox` from `policy/copilot/settings.json` locally.
+  `doctor.sh` fails without it; to opt out on one machine, add `"floorRemove": {"sandbox": null}` to `<data>/settings/copilot/settings.json`.
 
 How Copilot's three layers compare with Claude's:
 1. **Tool permissions** (`--allow-tool` / `--deny-tool shell(git push)`) are session flags, not saved.

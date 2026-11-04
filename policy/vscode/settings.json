@@ -8,6 +8,7 @@
   },
   "files.associations": {
     "**/.env*": "dotenv",
+    "**/.zshenv": "dotenv",
     "**/*.pem": "plaintext",
     "**/*.key": "plaintext",
     "**/*.p12": "plaintext",

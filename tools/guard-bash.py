@@ -118,6 +118,8 @@ SECRET_RX = re.compile(
     r"|Library/Keychains|Library/Cookies|Library/Application Support/(Google/Chrome|Firefox|BraveSoftware|Microsoft Edge))"
     r"|/etc/(shadow|sudoers|master\.passwd)|/(private/)?var/db/dslocal)(/.*)?$", re.I)
 ENVFILE_RX = re.compile(r"(^|/)\.env(\.(?!example$|sample$|template$|dist$)[^/]+)?$", re.I)
+# Shell env files that usually export tokens: denied both read and written (edit them by hand).
+SHELLENV_RX = re.compile(r"(^|/)\.(envrc|zshenv)$", re.I)
 KEYFILE_RX = re.compile(r"(^|/)(id_(rsa|ed25519|ecdsa|dsa)|[^/]+\.(pem|key|p12|pfx|kdbx|keystore|jks))$", re.I)
 POLICY_RX = re.compile(
     r"^(~/\.claude/(settings(\.local)?\.json|CLAUDE\.md|hooks(/.*)?|managed-settings\.json)|~/\.claude\.json"
@@ -141,7 +143,7 @@ STARTUP_RX = re.compile(
     r"|(.*/)?\.(npmrc|pypirc|yarnrc(\.yml)?|gitattributes|gitmodules))$", re.I)
 SYSTEM_RX = re.compile(r"^/(etc|private/etc|bin|sbin|System|Library|usr(?!/local)|var/root|private/var/db|Applications)(/.*)?$", re.I)
 USRLOCAL_RX = re.compile(r"^/usr/local(/.*)?$")
-PATH_CATEGORIES = (("secret", SECRET_RX), ("envfile", ENVFILE_RX), ("keyfile", KEYFILE_RX), ("policy", POLICY_RX),
+PATH_CATEGORIES = (("secret", SECRET_RX), ("envfile", ENVFILE_RX), ("shellenv", SHELLENV_RX),("keyfile", KEYFILE_RX), ("policy", POLICY_RX),
                    ("agent", AGENT_RX), ("startup", STARTUP_RX), ("usrlocal", USRLOCAL_RX), ("system", SYSTEM_RX))
 # Readers pull a file's content out; writers take every non-flag argument as a destination.
 READERS = {"cat", "less", "more", "head", "tail", "grep", "egrep", "fgrep", "rg", "ag", "awk", "sed", "cut",
@@ -168,7 +170,7 @@ def classify_path(t):
     if not p or p.startswith("-") or ("/" not in p and "." not in p):
         return None
     for cat, rx in PATH_CATEGORIES:
-        if (rx.search(p) if cat in ("envfile", "keyfile") else rx.match(p)):
+        if (rx.search(p) if cat in ("envfile", "shellenv", "keyfile") else rx.match(p)):
             return cat
     return None
 
@@ -543,6 +545,8 @@ def inspect_paths(name, toks, cwd, depth):
             found.append(("deny", f"{t}: credentials directory or file"))
         elif cat in ("envfile", "keyfile"):
             found.append(("deny" if name in READERS and not w else "ask", f"{t}: secrets file"))
+        elif cat == "shellenv":
+            found.append(("deny" if name in READERS or w else "ask", f"{t}: shell env file with secrets; edit it by hand"))
         elif cat == "policy" and (w or depth):
             found.append(("deny", f"{t}: the agent's own policy; edit it by hand and re-run install.sh"))
         elif cat == "agent" and (w or depth):

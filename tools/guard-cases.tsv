@@ -121,3 +121,12 @@ deny	echo {} > /srv/ai-memory/policy/copilot/settings.json
 deny	cp x.json templates/data/settings/agy/settings.json
 none	cat ~/ai-memory-data/settings/claude/settings.json
 none	cat policy/vscode/settings.json
+# --- shell env files (.envrc anywhere, .zshenv): deny on read and on write
+deny	cat ~/.zshenv
+deny	cat .envrc
+deny	grep TOKEN ~/work/app/.envrc
+deny	echo x >> ~/.zshenv
+deny	echo export X=1 > .envrc
+deny	cp /tmp/x ~/work/app/.envrc
+deny	sed -i s/a/b/ .envrc
+none	cat ~/.zshrc
