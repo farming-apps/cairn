@@ -100,7 +100,7 @@ for sec, projs in raw_data.items():
         # kind: workspace -> a plain folder holding several repos; one memory for the whole folder
         kind = "workspace" if str(cfg.get("kind", "")).strip().lower() == "workspace" else "repo"
         notes = str(cfg.get("notes", "")).replace("\t", " ").strip()
-        print(f"{sec}\t{name}\t{st}\t{p}\t{p_exp}\t{agents}\t{memory}\t{kind}\t{notes}")
+        print("\x1f".join([str(sec), str(name), st, p, p_exp, agents, memory, kind, notes]))
 PY
 }
 
@@ -110,10 +110,11 @@ case "$cmd" in
       echo "projects: $PROJECTS_FILE does not exist (run tools/install.sh or set CAIRN_PROJECTS)" >&2
       exit 1
     fi
-    printf '%-12s %-18s %-9s %-12s %-8s %s\n' "SECTION" "PROJECT" "STATUS" "REPO" "MEMORY" "PATH / NOTES"
-    printf '%-12s %-18s %-9s %-12s %-8s %s\n' "-------" "-------" "------" "----" "------" "------------"
+    # Buffer rows so each column can be sized to its longest value.
+    r_sec=("SECTION"); r_name=("PROJECT"); r_st=("STATUS")
+    r_repo=("REPO");   r_mem=("MEMORY");   r_tail=("PATH / NOTES")
     found=0
-    while IFS=$'\t' read -r sec name st p p_exp agents mem kind notes; do
+    while IFS=$'\x1f' read -r sec name st p p_exp agents mem kind notes; do
       [ -n "$name" ] || continue
       found=1
       if [ -z "$p_exp" ]; then
@@ -139,16 +140,36 @@ case "$cmd" in
         [ "$pend" -gt 0 ] && mem_st="pend:$pend" || mem_st="ok"
       fi
       tail_info="${p:-}"
+      tilde="~"; tail_info="${tail_info/#"$HOME"/$tilde}"
       [ -n "$notes" ] && tail_info="${tail_info:+$tail_info — }$notes"
-      printf '%-12s %-18s %-9s %-12s %-8s %s\n' "$sec" "$name" "$st" "$repo_st" "$mem_st" "$tail_info"
+      r_sec+=("$sec"); r_name+=("$name"); r_st+=("$st")
+      r_repo+=("$repo_st"); r_mem+=("$mem_st"); r_tail+=("$tail_info")
     done < <(parse_projects)
+
+    w_sec=0; w_name=0; w_st=0; w_repo=0; w_mem=0
+    for i in "${!r_name[@]}"; do
+      [ "${#r_sec[$i]}"  -gt "$w_sec" ]  && w_sec=${#r_sec[$i]}
+      [ "${#r_name[$i]}" -gt "$w_name" ] && w_name=${#r_name[$i]}
+      [ "${#r_st[$i]}"   -gt "$w_st" ]   && w_st=${#r_st[$i]}
+      [ "${#r_repo[$i]}" -gt "$w_repo" ] && w_repo=${#r_repo[$i]}
+      [ "${#r_mem[$i]}"  -gt "$w_mem" ]  && w_mem=${#r_mem[$i]}
+    done
+    fmt="%-${w_sec}s  %-${w_name}s  %-${w_st}s  %-${w_repo}s  %-${w_mem}s  %s\n"
+    dashes() { local s; printf -v s '%*s' "$1" ''; printf '%s' "${s// /-}"; }
+
+    printf "$fmt" "${r_sec[0]}" "${r_name[0]}" "${r_st[0]}" "${r_repo[0]}" "${r_mem[0]}" "${r_tail[0]}"
+    printf "$fmt" "$(dashes "$w_sec")" "$(dashes "$w_name")" "$(dashes "$w_st")" \
+      "$(dashes "$w_repo")" "$(dashes "$w_mem")" "$(dashes 12)"
+    for ((i = 1; i < ${#r_name[@]}; i++)); do
+      printf "$fmt" "${r_sec[$i]}" "${r_name[$i]}" "${r_st[$i]}" "${r_repo[$i]}" "${r_mem[$i]}" "${r_tail[$i]}"
+    done
     [ "$found" -eq 1 ] || echo "(no projects matched in $PROJECTS_FILE)"
     ;;
 
   paths)
     status_filter="${status_filter:-active}"
-    while IFS=$'\t' read -r sec name st p p_exp agents mem kind notes; do
-      [ "$mem" = "1" ] && [ -n "$p_exp" ] && [ -d "$p_exp" ] && printf '%s\n' "$p_exp"
+    while IFS=$'\x1f' read -r sec name st p p_exp agents mem kind notes; do
+      if [ "$mem" = "1" ] && [ -n "$p_exp" ] && [ -d "$p_exp" ]; then printf '%s\n' "$p_exp"; fi
     done < <(parse_projects)
     ;;
 
@@ -158,7 +179,7 @@ case "$cmd" in
       exit 1
     fi
     status_filter="${status_filter:-active}"
-    while IFS=$'\t' read -r sec name st p p_exp agents mem kind notes; do
+    while IFS=$'\x1f' read -r sec name st p p_exp agents mem kind notes; do
       [ -n "$name" ] || continue
       if [ "$mem" = "0" ]; then
         echo "[$sec/$name] memory: false (skipped)"
