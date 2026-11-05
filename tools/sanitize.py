@@ -56,6 +56,10 @@ ENTROPY_CANDIDATE = re.compile(r"[A-Za-z0-9+/=_-]{32,}")
 ENTROPY_THRESHOLD = 4.5
 # Markers that are not secrets even though they are long and varied.
 ENTROPY_SKIP = re.compile(r"^(sha256-|sha384-|sha512-|[0-9a-f]{32,}$)")
+PUBLIC_COMMIT_URL = re.compile(
+    r"^github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/commit/[0-9a-f]{40}$",
+    re.IGNORECASE,
+)
 # Assignment values that are references, not secrets: os.environ/X, ${X}, $X, <placeholder>,
 # or an uppercase variable name.
 REFERENCE_VALUE = re.compile(r"^(os\.environ/|\$\{?|<|env:|secrets\.|[A-Z][A-Z0-9_]*$)")
@@ -107,7 +111,11 @@ def scan_text(rel_path, text, forbidden):
                 findings.append((rel_path, lineno, rule_id, mask(m.group(0))))
         for m in ENTROPY_CANDIDATE.finditer(line):
             tok = m.group(0)
-            if ENTROPY_SKIP.match(tok):
+            github_commit = (
+                line[:m.start()].lower().endswith("github.")
+                and PUBLIC_COMMIT_URL.match("github." + tok)
+            )
+            if ENTROPY_SKIP.match(tok) or github_commit:
                 continue
             if shannon(tok) >= ENTROPY_THRESHOLD:
                 findings.append((rel_path, lineno, "high-entropy", mask(tok)))

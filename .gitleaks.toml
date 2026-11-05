@@ -26,6 +26,8 @@ description = "Files that contain patterns on purpose, and marked lines"
 paths = [
   '''tools/sanitize\.py''',
   '''\.gitleaks\.toml''',
+  # Fake high-entropy fixture that checks sanitize.py still reports secrets.
+  '''tools/test-sanitize\.py''',
 ]
 regexTarget = "line"
 regexes = ['''sanitize:allow''']
