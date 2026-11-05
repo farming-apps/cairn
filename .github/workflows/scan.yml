@@ -5,22 +5,29 @@ on:
   push:
   pull_request:
 
-# gitleaks-action lists the PR's commits through the API; the default token cannot read pull requests.
+# The gitleaks CLI is used directly: gitleaks-action requires a paid license for organization repos.
 permissions:
   contents: read
-  pull-requests: read
 
 jobs:
   gitleaks:
     runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: 8.21.2
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_CONFIG: .gitleaks.toml
+      - name: Install gitleaks
+        run: |
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfLO "$base/$tarball"
+          curl -sSfL "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt" | grep " $tarball\$" | sha256sum -c -
+          tar -xzf "$tarball" gitleaks
+      - name: Scan history
+        # --redact keeps any finding out of the public log.
+        run: ./gitleaks git --config .gitleaks.toml --redact --verbose .
 
   sanitize:
     runs-on: ubuntu-latest
