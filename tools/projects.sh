@@ -87,6 +87,8 @@ for sec, projs in raw_data.items():
     if not isinstance(projs, dict):
         continue
     for name, cfg in projs.items():
+        if name == "defaults":  # per-section settings shared with other tools (e.g. git identity), not a project
+            continue
         if not isinstance(cfg, dict):
             cfg = {}
         st = str(cfg.get("status", "active")).strip() or "active"
