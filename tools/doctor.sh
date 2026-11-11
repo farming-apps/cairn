@@ -402,11 +402,14 @@ if has_module projects || [ "${#args_repos[@]}" -gt 0 ]; then
     [ -n "$repo" ] || continue
     echo "work repo: $repo"
     if [ -f "$repo/CLAUDE.local.md" ]; then check_imports "$repo/CLAUDE.local.md"; else fail "no CLAUDE.local.md (tools/new-project.sh <name> $repo)"; fi
-    if [ -f "$repo/.claude/settings.local.json" ] && grep -q autoMemoryDirectory "$repo/.claude/settings.local.json"; then
-      ok "autoMemoryDirectory configured"
-    else
-      warn "no autoMemoryDirectory: Claude auto-memory will go to the default directory"
-    fi
+    amd=""
+    [ -f "$repo/.claude/settings.local.json" ] && amd="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("autoMemoryDirectory") or "")' "$repo/.claude/settings.local.json" 2>/dev/null)"
+    amd="${amd/#\~/$HOME}"
+    case "$amd" in
+      "") warn "no autoMemoryDirectory: Claude auto-memory will go to the default directory (tools/projects.sh sync)" ;;
+      "$PM_DIR"/*/memory) ok "autoMemoryDirectory -> ${amd#"$DATA"/}" ;;
+      *) warn "autoMemoryDirectory points outside $DATA_TILDE/projects/<p>/memory: $amd (stale layout? run tools/projects.sh sync)" ;;
+    esac
     if [ -f "$repo/.agents/rules/cairn.md" ]; then
       check_imports "$repo/.agents/rules/cairn.md"
     elif [ -f "$repo/GEMINI.md" ]; then
@@ -428,6 +431,21 @@ if has_module projects || [ "${#args_repos[@]}" -gt 0 ]; then
       ok "git status clean of personal files"
     fi
   done
+
+  # Auto-memory written outside the memory repo: the legacy layout-1 folder, recreated by clients whose
+  # bridges were never re-synced, and Claude Code's default per-folder directory (folders not connected).
+  echo "memory outside cairn:"
+  stray=0
+  if [ -d "$DATA/project-memories" ]; then
+    warn "$DATA_TILDE/project-memories/ exists (layout 1): move its files to projects/<p>/memory/ and delete it"; stray=1
+  fi
+  for d in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/projects/*/memory; do
+    [ -d "$d" ] || continue
+    n="$(find "$d" -maxdepth 1 -type f -name '*.md' ! -name MEMORY.md | wc -l | tr -d ' ')"
+    [ "$n" -gt 0 ] || continue
+    warn "$n memory file(s) in $(tilde_path "$d"): that folder is not connected (tools/new-project.sh <name> <path>)"; stray=1
+  done
+  [ "$stray" -eq 1 ] || ok "none"
 fi
 
 echo
