@@ -33,6 +33,10 @@ which links `cairn` into `~/.local/bin`. `--data` creates the memory repo if mis
 machine, clone yours there first) and is remembered for later runs. To review the script first,
 download it, read it and run it with `bash bootstrap.sh --data ~/cairn-data`.
 
+To update, run `cairn update`; running the same one-liner again does the same. The installed copy
+is generated: if something changed it by hand, the update restores it and saves the diff to
+`~/.config/cairn/`.
+
 `install.sh` is idempotent and asks before installing anything. It detects which clients are present
 (none is mandatory), writes the import block into each client's global instructions, enables the
 pre-commit hooks, and merges the security floor into each client's settings while keeping yours.
