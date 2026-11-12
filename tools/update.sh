@@ -87,6 +87,9 @@ fi
 current="$(g describe --tags --exact-match HEAD 2>/dev/null || g rev-parse --short HEAD)"
 head_sha="$(g rev-parse HEAD)"; target_sha="$(g rev-parse "$target^{commit}")"
 if [ "$head_sha" = "$target_sha" ]; then
+  if [ "$CHECK" -eq 0 ] && [ "$ROOT" = "$install_real" ]; then   # same version, but repair a touched copy
+    heal_installed_copy "$ROOT" "$DRY" || { say "update: could not restore $ROOT; delete it and re-run tools/bootstrap.sh" >&2; exit 1; }
+  fi
   say "cairn is up to date ($current, version $(cairn_version))"
   exit 0
 fi
@@ -96,7 +99,10 @@ if [ "$CHECK" -eq 1 ]; then
 fi
 
 # Never overwrite work: refuse on a dirty tree or on a branch with commits that are not on origin.
-if [ -n "$(g status --porcelain --untracked-files=no)" ]; then
+# The installed copy is generated, so it is restored instead (heal_installed_copy saves the diff).
+if [ "$ROOT" = "$install_real" ]; then
+  heal_installed_copy "$ROOT" "$DRY" || { say "update: could not restore $ROOT; delete it and re-run tools/bootstrap.sh" >&2; exit 1; }
+elif [ -n "$(g status --porcelain --untracked-files=no)" ]; then
   say "update: $ROOT has uncommitted changes. This looks like a development clone;" >&2
   say "        the installed copy comes from tools/install.sh or tools/bootstrap.sh (see README, 'Install')." >&2
   exit 1

@@ -69,6 +69,23 @@ data_file() { # rel-path
 # 0 when memory lives in its own repository, 1 in the single-repo layout.
 data_is_separate() { [ "$DATA" != "$ROOT" ]; }
 
+# The installed copy is generated: local changes there are never the user's work (usually a mode
+# change or a stray edit). Restore it to its commit instead of blocking install/update; the discarded
+# diff is saved to $LOCAL_DIR so nothing is lost. Dry run only reports. Returns 1 if it cannot restore.
+heal_installed_copy() { # dir [dry=0]
+  local dir="$1" dry="${2:-0}" patch
+  git -C "$dir" config core.fileMode true 2>/dev/null || true   # a lost +x is a real change: restore it
+  [ -n "$(git -C "$dir" status --porcelain 2>/dev/null)" ] || return 0
+  printf 'installed copy %s has local changes (it is generated); restoring it:\n' "$(tilde_path "$dir")"
+  git -C "$dir" status --porcelain | sed 's/^/  /'
+  [ "$dry" -eq 1 ] && { printf '  + git checkout -- . && git clean -fd\n'; return 0; }
+  mkdir -p "$LOCAL_DIR"
+  patch="$LOCAL_DIR/installed-copy-$(date +%Y%m%d-%H%M%S).patch"
+  git -C "$dir" diff HEAD > "$patch" 2>/dev/null || true
+  [ -s "$patch" ] && printf '  saved the diff to %s\n' "$(tilde_path "$patch")" || rm -f "$patch"
+  git -C "$dir" checkout --quiet -- . && git -C "$dir" clean -fdq || return 1
+}
+
 # Root the client hooks should point to: the installed worktree if there is one, else this repo (--dev).
 hook_root() {
   if [ -f "$INSTALL_DIR/tools/guard-bash.py" ]; then (cd "$INSTALL_DIR" && pwd -P); else printf '%s' "$ROOT"; fi

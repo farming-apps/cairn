@@ -33,6 +33,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Scripts are executable in git
+        # install.sh never chmods the installed copy, so a 100644 script would simply not run there.
+        run: |
+          bad="$(git ls-files -s -- '.githooks/*' 'tools/*.sh' 'tools/*.py' tools/ai tools/cairn | awk '$1 != "100755"')"
+          [ -z "$bad" ] || { echo "not executable in git (git update-index --chmod=+x <file>):"; echo "$bad"; exit 1; }
       - run: python3 tools/test-sanitize.py
       - run: python3 tools/sanitize.py --all
       - run: tools/check-size.sh

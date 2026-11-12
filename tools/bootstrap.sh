@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# First install without cloning by hand. Clones the tool into the installed-copy location
+# Install or update without cloning by hand. On a first run it clones the tool into the installed-copy location
 # ($CAIRN_INSTALL_DIR or ~/.local/share/cairn), checks out the latest release (origin/main
-# before the first one) and runs install.sh from there. Afterwards, tools/update.sh moves that copy.
+# before the first one) and runs install.sh from there. When it is already installed, the same
+# command updates it (tools/update.sh), so the one-liner below is both install and update.
 #
 #   curl -fsSL https://raw.githubusercontent.com/farming-apps/cairn/main/tools/bootstrap.sh | bash -s -- --data ~/cairn-data
 #
@@ -23,9 +24,17 @@ for t in git python3; do
     || die "$t is required (macOS: xcode-select --install; Debian/Ubuntu: apt install git python3)"
 done
 
+# Piped from curl, stdin is the script itself, so install.sh/update.sh could not ask anything:
+# hand the scripts it starts the terminal when there is one (never this one: bash is still reading it).
+IN=/dev/stdin
+if [ ! -t 0 ] && (exec </dev/tty) 2>/dev/null; then IN=/dev/tty; fi
+
 if [ -e "$DIR" ]; then
   if [ -f "$DIR/tools/install.sh" ]; then
-    die "already installed at $DIR; update with: $DIR/tools/update.sh (or re-run $DIR/tools/install.sh)"
+    say "bootstrap: already installed at $DIR; updating it"
+    upd=()   # update.sh takes --yes/--dry-run; the rest (e.g. --data) is remembered from the install
+    for a in "$@"; do case "$a" in --yes|--dry-run) upd+=("$a") ;; esac; done
+    exec bash "$DIR/tools/update.sh" ${upd[@]+"${upd[@]}"} <"$IN"
   fi
   die "$DIR exists and is not a cairn install; move it or set CAIRN_INSTALL_DIR"
 fi
@@ -48,4 +57,4 @@ ref="$(git -C "$DIR" tag -l 'v[0-9]*' --sort=-v:refname | head -1)"
 git -C "$DIR" checkout --quiet --detach "$ref"
 say "bootstrap: $DIR at $ref ($(git -C "$DIR" rev-parse --short HEAD))"
 
-exec bash "$DIR/tools/install.sh" ${args[@]+"${args[@]}"}
+exec bash "$DIR/tools/install.sh" ${args[@]+"${args[@]}"} <"$IN"

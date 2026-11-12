@@ -109,7 +109,7 @@ if has_module hardening; then
   if [ -f "$INSTALL_DIR/tools/guard-bash.py" ]; then
     inst_at="$(git -C "$INSTALL_DIR" describe --tags --exact-match HEAD 2>/dev/null || git -C "$INSTALL_DIR" rev-parse --short HEAD 2>/dev/null)"
     if [ -n "$(git -C "$INSTALL_DIR" status --porcelain 2>/dev/null)" ]; then
-      fail "installed copy $INSTALL_DIR has local changes (it is generated: discard them and re-run tools/install.sh)"
+      fail "installed copy $INSTALL_DIR has local changes (it is generated; cairn update restores it)"
     else
       ok "installed copy at $inst_at (detached worktree; tools/update.sh moves it)"
     fi

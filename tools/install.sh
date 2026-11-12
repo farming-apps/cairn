@@ -106,10 +106,8 @@ if [ "$FROM_WORKTREE" -eq 0 ] && [ "$DEV" -eq 0 ]; then
   elif ! data_is_separate; then
     printf 'source: single-repo layout (memory inside this clone); installing from it as it is (--dev)\n'
   elif [ -e "$INSTALL_DIR/.git" ]; then
-    if [ -n "$(git -C "$INSTALL_DIR" status --porcelain 2>/dev/null)" ]; then
-      printf 'install: %s has local changes (git -C %s status); it is a generated copy: discard them and re-run\n' "$INSTALL_DIR" "$INSTALL_DIR" >&2
-      exit 1
-    fi
+    heal_installed_copy "$INSTALL_DIR" "$DRY" \
+      || { printf 'install: could not restore %s; delete it and re-run\n' "$INSTALL_DIR" >&2; exit 1; }
     printf 'source: installed copy %s at %s (tools/update.sh changes the version)\n' "$INSTALL_DIR" \
       "$(git -C "$INSTALL_DIR" describe --tags --exact-match HEAD 2>/dev/null || git -C "$INSTALL_DIR" rev-parse --short HEAD)"
   else
@@ -350,7 +348,11 @@ if has_module hardening; then
   say "1. git hooks & forbidden terms"
   if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
     run git -C "$ROOT" config core.hooksPath .githooks
-    run chmod +x "$ROOT"/.githooks/* "$ROOT"/tools/*.sh "$ROOT"/tools/*.py "$ROOT"/tools/ai
+    # Modes come from git; only a dev clone or a copied tree may have lost them. Never touch the
+    # installed copy, or it would show local changes.
+    if [ "$ROOT" != "$(hook_root)" ] || [ ! -d "$INSTALL_DIR" ]; then
+      run chmod +x "$ROOT"/.githooks/* "$ROOT"/tools/*.sh "$ROOT"/tools/*.py "$ROOT"/tools/ai
+    fi
   else
     say "  warning: $ROOT is not a git repository; run 'git init' and re-run"
   fi
